@@ -40,12 +40,16 @@ export async function runWithFallback<T>(opts: {
   ];
   const attempts: AttemptLog[] = [];
 
-  for (const step of plan) {
+  // Demo switch (SPEC §7.4): 1 = attempt 1 fails (shows fallback), 2 = both fail (shows S2c).
+  const forceFail = Number(process.env.FORCE_AI_FAIL || 0);
+
+  for (const [i, step] of plan.entries()) {
     const timeoutMs = step.timeout();
     if (timeoutMs < 2_000) break;
     const a0 = Date.now();
     let text = "";
     try {
+      if (forceFail >= i + 1) throw new Error(`FORCE_AI_FAIL=${forceFail}`);
       text = await callModel({ model: step.model, system: opts.system, user: opts.user, schema: opts.schema, timeoutMs });
       const value = opts.accept(JSON.parse(text));
       attempts.push({ model: step.model, ms: Date.now() - a0, ok: true });

@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
+import { NotFoundView } from "@/components/not-found-view";
 import { use, useCallback, useEffect, useRef, useState } from "react";
-import { StoreView } from "@/components/store-view";
+import StoreEditor, { type Counts } from "./store-editor";
 import type { EditorView } from "@/lib/server/store-access";
 import { saveStore, listStores } from "@/lib/client/device";
 
@@ -12,7 +13,7 @@ const LINES = [
   "Writing your page…",
 ];
 
-type Load = { state: "loading" } | { state: "missing" } | { state: "ok"; store: EditorView };
+type Load = { state: "loading" } | { state: "missing" } | { state: "ok"; store: EditorView & { counts: Counts | null } };
 
 export default function Editor({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params);
@@ -24,7 +25,7 @@ export default function Editor({ params }: { params: Promise<{ token: string }> 
       const res = await fetch(`/api/stores/${encodeURIComponent(token)}`, { cache: "no-store" });
       if (res.status === 404) return { state: "missing" };
       if (!res.ok) return null;
-      const store: EditorView = await res.json();
+      const store: EditorView & { counts: Counts | null } = await res.json();
       // Remember the edit link on this device (also covers links opened on a new device).
       if (!listStores().some((s) => s.token === token) && store.draft) {
         saveStore({
@@ -64,7 +65,7 @@ export default function Editor({ params }: { params: Promise<{ token: string }> 
   }, [load, active, fetchStore]);
 
   if (load.state === "loading") return <Skeleton line={LINES[0]} />;
-  if (load.state === "missing") return <NotFound />;
+  if (load.state === "missing") return <NotFoundView />;
 
   const s = load.store;
   const restart = async (path: "retry" | "answer", body?: unknown) => {
@@ -104,20 +105,26 @@ export default function Editor({ params }: { params: Promise<{ token: string }> 
   }
 
   if (s.status === "needs_input" && s.followUp?.kind === "needs_more") {
-    return <PickDirection question={s.followUp.question} directions={s.followUp.directions} onPick={(d) => restart("answer", { direction: d })} />;
+    return (
+      <PickDirection
+        question={s.followUp.question}
+        directions={s.followUp.directions}
+        allowText={s.followUp.round < 2}
+        onPick={(d) => restart("answer", { direction: d })}
+      />
+    );
   }
 
   if (s.status === "ready" && s.draft) {
     return (
-      <div className="space-y-4 pb-24">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-zinc-500">Your store</span>
-          <span className="rounded-full bg-zinc-100 px-2 py-1 text-xs font-medium">
-            {s.publishedAt ? (s.hasUnpublishedChanges ? "Unpublished changes" : "Live") : "Draft"}
-          </span>
-        </div>
-        <StoreView content={s.draft} />
-      </div>
+      <StoreEditor
+        token={token}
+        slug={s.slug}
+        draft={s.draft}
+        publishedAt={s.publishedAt}
+        hasUnpublishedChanges={s.hasUnpublishedChanges}
+        counts={s.counts}
+      />
     );
   }
   return <Skeleton line="Loading…" />;
@@ -170,7 +177,17 @@ function Skeleton({ line }: { line: string }) {
   );
 }
 
-function PickDirection({ question, directions, onPick }: { question: string; directions: string[]; onPick: (d: string) => void }) {
+function PickDirection({
+  question,
+  directions,
+  allowText,
+  onPick,
+}: {
+  question: string;
+  directions: string[];
+  allowText: boolean;
+  onPick: (d: string) => void;
+}) {
   const [text, setText] = useState("");
   return (
     <div className="space-y-4 py-6">
@@ -182,7 +199,8 @@ function PickDirection({ question, directions, onPick }: { question: string; dir
           </button>
         ))}
       </div>
-      <div className="space-y-2">
+      {!allowText && <p className="text-sm text-zinc-600">Pick the one closest to what you do.</p>}
+      <div className={allowText ? "space-y-2" : "hidden"}>
         <input
           className="w-full rounded-xl border border-zinc-300 px-3 py-3"
           placeholder="or describe it yourself"
@@ -198,17 +216,6 @@ function PickDirection({ question, directions, onPick }: { question: string; dir
           Continue
         </button>
       </div>
-    </div>
-  );
-}
-
-function NotFound() {
-  return (
-    <div className="space-y-4 py-16 text-center">
-      <h1 className="text-xl font-semibold">This store doesn&apos;t exist (yet).</h1>
-      <Link href="/" className="block min-h-12 rounded-xl bg-zinc-900 py-3 text-white">
-        Create your own store
-      </Link>
     </div>
   );
 }

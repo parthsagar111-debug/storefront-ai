@@ -8,12 +8,14 @@ import {
   GenerationResult,
   BioResult,
   ProductResult,
+} from "../src/lib/ai/schemas";
+import {
   GenerationResultUnionSchema,
   GenerationResultFlatSchema,
   BioResultSchema,
   ProductResultSchema,
   normalizeFlat,
-} from "../src/lib/ai/schemas";
+} from "../src/lib/ai/response-schemas";
 import { systemPrompt, generationUserPrompt, bioUserPrompt, productUserPrompt, type CreatorInput } from "../src/lib/ai/prompts";
 import { writeFileSync, mkdirSync } from "node:fs";
 

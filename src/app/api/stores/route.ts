@@ -4,6 +4,7 @@ import { db, type StoreRow } from "@/lib/server/db";
 import { isValidToken, tokenHash, ipHash, makeSlug } from "@/lib/server/crypto";
 import { StoreInputSchema } from "@/lib/server/input";
 import { runGeneration } from "@/lib/server/generation";
+import { creationLimited } from "@/lib/server/rules";
 
 export const maxDuration = 60;
 
@@ -40,7 +41,9 @@ export async function POST(req: Request) {
   const input = StoreInputSchema.safeParse(body.data.input);
   if (!input.success) return json({ error: "invalid_input", issues: input.error.issues.map((i) => i.path.join(".")) }, 400);
 
-  // Step 3: creation rate limit — slice 5.
+  // Step 3: creation rate limit — new stores only (T6, best-effort T13).
+  const ip = ipHash(req);
+  if (await creationLimited(ip)) return json({ error: "rate_limited" }, 429);
 
   // Step 4: insert. Unique violation on client_request_id → concurrent duplicate → back to step 1.
   for (let i = 0; i < 3; i++) {
@@ -49,7 +52,7 @@ export async function POST(req: Request) {
       .insert({
         slug: makeSlug(input.data.name),
         client_request_id: clientRequestId,
-        creator_ip_hash: ipHash(req),
+        creator_ip_hash: ip,
         edit_token_hash: hash,
         status: "pending",
         input: input.data,

@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { storeForToken, notFound } from "@/lib/server/store-access";
 import { claimGeneration, runGeneration } from "@/lib/server/generation";
+import { generationLimited, tooMany } from "@/lib/server/rules";
 
 export const maxDuration = 60;
 
@@ -16,6 +17,8 @@ export async function POST(_req: Request, ctx: RouteContext<"/api/stores/[token]
 
   const retryable = store.status === "failed" || store.status === "pending" || store.is_stale;
   if (!retryable) return Response.json({ started: false, status: store.status }, { status: 409 });
+
+  if (await generationLimited(store.id)) return tooMany(); // T19 shared limit
 
   // Claim now (synchronously) so the response tells the truth; the claimed run continues in after().
   const claimed = await claimGeneration(store.id);

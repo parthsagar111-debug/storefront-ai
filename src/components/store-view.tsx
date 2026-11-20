@@ -34,8 +34,11 @@ export function StoreView({
   headerSlot,
   productSlot,
   productCta,
+  busy,
 }: {
   content: TStoreContent;
+  /** Section being regenerated: that block pulses, the rest stays usable. */
+  busy?: { header?: boolean; productId?: string | null; all?: boolean };
   headerSlot?: ReactNode;
   productSlot?: (p: TProduct, index: number) => ReactNode;
   productCta?: (p: TProduct) => ReactNode;
@@ -44,7 +47,7 @@ export function StoreView({
   const c = content.creator;
   return (
     <div className="space-y-5" style={{ ["--accent" as string]: t.accent }}>
-      <header className="space-y-3">
+      <header className={`space-y-3 ${busy?.header || busy?.all ? "pointer-events-none animate-pulse opacity-50" : ""}`}>
         <div className="flex items-center gap-3">
           <div
             className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-lg font-semibold text-white"
@@ -74,7 +77,14 @@ export function StoreView({
 
       <section className="space-y-4">
         {content.products.map((p, i) => (
-          <ProductCard key={p.id} p={p} theme={t} cta={productCta?.(p)} slot={productSlot?.(p, i)} />
+          <ProductCard
+            key={p.id}
+            p={p}
+            theme={t}
+            cta={productCta?.(p)}
+            slot={productSlot?.(p, i)}
+            busy={busy?.all || busy?.productId === p.id}
+          />
         ))}
       </section>
     </div>
@@ -86,15 +96,19 @@ function ProductCard({
   theme,
   cta,
   slot,
+  busy,
 }: {
   p: TProduct;
+  busy?: boolean;
   theme: (typeof THEMES)[keyof typeof THEMES];
   cta?: ReactNode;
   slot?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <article className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+    <article
+      className={`overflow-hidden rounded-2xl border border-zinc-200 bg-white ${busy ? "pointer-events-none animate-pulse opacity-50" : ""}`}
+    >
       <div
         className="relative flex h-24 items-center gap-3 px-4 text-white"
         style={{ background: `linear-gradient(135deg, ${theme.from}, ${theme.to})` }}

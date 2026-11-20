@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/server/db";
 import { storeForToken, notFound } from "@/lib/server/store-access";
 import { runGeneration } from "@/lib/server/generation";
+import { generationLimited, tooMany } from "@/lib/server/rules";
 
 export const maxDuration = 60;
 
@@ -17,6 +18,11 @@ export async function POST(req: Request, ctx: RouteContext<"/api/stores/[token]/
   if (!body.success) return Response.json({ error: "bad_request" }, { status: 400 });
   if (store.status !== "needs_input" || store.follow_up?.kind !== "needs_more")
     return Response.json({ error: "not_waiting_for_input", status: store.status }, { status: 409 });
+
+  // S2b: after 2 rounds the creator must pick one of the chips (never generate from thin input).
+  if (store.follow_up.round >= 2 && !store.follow_up.directions.includes(body.data.direction))
+    return Response.json({ error: "pick_a_direction" }, { status: 400 });
+  if (await generationLimited(store.id)) return tooMany(); // T19 shared limit
 
   const { error } = await db()
     .from("stores")

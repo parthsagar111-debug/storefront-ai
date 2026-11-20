@@ -3,7 +3,8 @@ import { db, logEvent, type StoreRow, type FollowUp } from "./db";
 import { toCreatorInput } from "./input";
 import { runWithFallback } from "@/lib/ai/pipeline";
 import { parseGeneration, buildStoreContent } from "@/lib/ai/build-store";
-import { GenerationResultUnionSchema, type TStoreContent } from "@/lib/ai/schemas";
+import { type TStoreContent } from "@/lib/ai/schemas";
+import { GenerationResultUnionSchema } from "@/lib/ai/response-schemas";
 import { systemPrompt, generationUserPrompt } from "@/lib/ai/prompts";
 
 export const GENERATION_BUDGET_MS = 50_000;
