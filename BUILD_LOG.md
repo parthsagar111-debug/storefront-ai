@@ -4,6 +4,57 @@ Per slice: what was built, problems hit, decisions made, how AI tools were used.
 
 ---
 
+## ☀️ Morning report — Sat 21 Nov
+
+**Live:** https://storefront-ai-blush.vercel.app · showcase store: https://storefront-ai-blush.vercel.app/s/ananya-sharma-9h46
+**Core gate on the live URL: 43/43 pass** (run twice: right after the slice 6 deploy and again on the final deploy). UI checks at 360 px and 1440 px on live: 24/24 pass.
+**Rollback point:** git tag `slice-5-done` (not needed: nothing failed).
+
+### Models (task 1)
+Our key lists 19 Gemini models. I tested every Flash model with the exact production path (system prompt + generation prompt + union `responseSchema` → Zod → all deterministic checks), cooking persona, 3 calls each, stopping a model at its first quota error to save free-tier requests (`scripts/model-bench.mts`).
+
+| Model | Works | Latency (3 calls) |
+|---|---|---|
+| **gemini-3.5-flash-lite** → `GEMINI_MODEL` | ✅ 3/3 | avg 3.0 s (2.97–3.05) |
+| **gemini-3.1-flash-lite** → `GEMINI_FALLBACK_MODEL` | ✅ 3/3 | avg 4.7 s (4.0–5.3) |
+| gemini-3.6-flash | ✅ 3/3 | avg 9.9 s, one call 21.2 s |
+| gemini-3.5-flash | ✅ 3/3 | avg 16.3 s, up to 26.4 s |
+| gemini-3.7-flash | ❌ | 504, then 429 free-tier quota |
+| gemini-3.8-flash | ❌ | 503, then 429 |
+| gemini-omni-flash-preview | ❌ | 429 |
+| gemini-2.5-flash / 2.5-flash-lite | ❌ | 404 "no longer available" |
+
+**Why:** 3.5 Flash-Lite is the fastest and steadiest and passes every check; 3.1 Flash-Lite is a different model (own quota) that also passes everything. The two non-lite Flash models work but have 21–26 s calls, which would trip the 22 s attempt-1 cap and waste the budget. Raw outputs: `scripts/out/bench-<model>.json` (e.g. 3.5 Flash-Lite: "Tasty everyday Indian vegetarian meals in under 20 minutes", ebook/low first; 3.1 Flash-Lite: "Roz ka khana, sirf 20 minute mein").
+**Confirmed live:** a new store generated on the **first attempt** by gemini-3.5-flash-lite in 2.6 s model time (`scripts/first-attempt.mjs`, attempts logged in the DB). When billing clears, re-run `npx tsx --conditions=react-server scripts/model-bench.mts gemini-3.8-flash gemini-3.7-flash` and switch the env vars if 3.8 is fast enough — no code change needed.
+
+### Slice 6 (task 2)
+- Design export rendered to `Design/png/01…17-*.png` (Playwright + system Chrome; each board is an iframe, waited for content + fonts). Tokens in `Design/TOKENS.md` ("Haldi & Ink": paper/ink neutrals, 4 store accents, 7 format-cover gradients, Bricolage Grotesque + Plus Jakarta Sans), wired into the Tailwind `@theme`.
+- Rebuilt as our own components (`components/ui.tsx`, `icons.tsx`, `store-view.tsx`, `sheet.tsx` + the screens). **No logic or API changes** — fetching, polling, PATCH/publish/regenerate calls and validation are untouched; SPEC copy kept where the design differs (e.g. "Add & publish" / "Skip, show "I'm interested" instead", not "Publish with/without WhatsApp").
+- The requested behaviours, each checked by `scripts/ui-shots.mjs` / `scripts/ui-states.mjs` on live:
+  - **Create button reachable with the keyboard open at 360 px:** sticky CTA + `interactive-widget=resizes-content` + scroll margin on fields. At 360×420 with a field focused, the button is fully visible and the field sits above it.
+  - **Direction chip selects, "Use this" submits** (verified the POST carries exactly the selected chip; nothing is sent on chip tap).
+  - **One badge + matching button per public card:** Coming soon → I'm interested (+ Ask on WhatsApp / Follow on Instagram links when present); Available now → Enquire on WhatsApp. Verified on a store with both.
+  - **No placeholder text:** no `placeholder` attributes and no sample/design content anywhere; everything shown comes from the store's data.
+  - **Regenerate dims the existing card** with a "Regenerating…" overlay (card count unchanged, one pill, failure → toast, card kept).
+  - **Desktop frames at 1440:** public store in a 480 px frame on a dotted backdrop; editor with top-bar actions and the edit sheet as a right side panel below the bar, preview shifted left.
+- Also checked: no horizontal scroll and all tap targets ≥ 44 px on S1, S3, S5; store fits in 2.1 screens at 360 px.
+
+### Screenshots (live)
+| S1 · 360 | S3 · 360 | S5 · 360 |
+|---|---|---|
+| ![S1](docs/screenshots/S1-360.png) | ![S3](docs/screenshots/S3-360.png) | ![S5](docs/screenshots/S5-360.png) |
+
+S5 · 1440: ![S5 desktop](docs/screenshots/S5-1440.png)
+More in `docs/screenshots/`: S1 with keyboard, S2, S2b (chip selected), S2c retry + unclear, S3 regenerating, product sheet, S3 desktop side panel, S6.
+
+### Not finished / for you
+1. **Real-phone pass** (SPEC core gate requirement) — everything above is Playwright on desktop Chrome with mobile emulation. In particular **iOS Safari ignores `interactive-widget`**: the focused field scrolls into view, but the sticky Create button may sit behind the iOS keyboard until you dismiss it. Android Chrome should keep it above the keyboard. Worth checking on your phone.
+2. **Gemini billing** still pending; the app runs on free-tier Flash-Lite quotas (separate per model, so primary + fallback cover each other, but a busy review day could still hit daily limits).
+3. Not built (cut-first, SPEC §13): accent-colour picker (D16 — the design marks it optional), the remaining non-core edge cases. The D7 "rejected alternative" board is reference material for the decision doc, not a screen.
+4. Test stores from the gate runs are in the live DB (slugs `ananya-sharma-*`, `meera-iyer-*`, `ravi-*`); harmless, but you may want to delete them before sharing the URL widely.
+
+---
+
 ## Slice 0 — repo, schema, env, hello world, model check (Fri 20 – Sat 21 Nov)
 
 ### Built

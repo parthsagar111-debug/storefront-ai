@@ -19,7 +19,7 @@ npm run dev
 | Var | Notes |
 |---|---|
 | `GEMINI_API_KEY` | server only |
-| `GEMINI_MODEL` / `GEMINI_FALLBACK_MODEL` | primary / fallback model ids |
+| `GEMINI_MODEL` / `GEMINI_FALLBACK_MODEL` | primary / fallback model ids (live: `gemini-3.5-flash-lite` / `gemini-3.1-flash-lite`, see BUILD_LOG) |
 | `IP_HASH_SALT` | random string for hashing IPs |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | server only, never `NEXT_PUBLIC_` |
 | `NEXT_PUBLIC_APP_URL` | public base URL |
