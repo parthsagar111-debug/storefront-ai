@@ -2,7 +2,7 @@
 
 A creator answers three quick questions and taps twice on their phone, and gets a published storefront (bio, 2–4 product ideas with INR prices) at a shareable link. The link also shows which idea gets the most interest. Built as a take-home for SuperProfile. See `SPEC.md`.
 
-**Live:** _added after first deploy_
+**Live:** https://storefront-ai-blush.vercel.app
 
 ## Stack
 Next.js 16 (App Router), TypeScript, Tailwind, Zod, `@google/genai` (Gemini), Supabase Postgres (server-side service-role key only), Vercel.

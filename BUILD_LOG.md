@@ -39,3 +39,9 @@ Per slice: what was built, problems hit, decisions made, how AI tools were used.
 
 ### AI tools
 - Claude Code: scaffold, schema, prompt wiring, model-check script, running real calls.
+
+### Deploy
+- GitHub: https://github.com/parthsagar111-debug/storefront-ai (public). Commits use the GitHub noreply address.
+- Vercel: https://storefront-ai-blush.vercel.app (`storefront-ai.vercel.app` was taken). Git-connected; pushes to `main` deploy.
+- Env vars on Vercel (production + preview), all marked sensitive except `NEXT_PUBLIC_APP_URL`. `SUPABASE_DB_URL` is not on Vercel.
+- Checks: `/` returns 200; `/api/health` shows gemini/supabase/salt present; the client JS bundle (~570 KB) contains neither the Gemini key nor the Supabase secret key (implementation check 3, re-run after each slice).
