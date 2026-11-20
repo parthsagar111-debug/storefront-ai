@@ -1,0 +1,47 @@
+{
+  "status": "ok",
+  "headline": "Ghar ka khana, fast aur tasty. Daily cooking made effortless.",
+  "bio": "Hey, main Ananya! Working professionals aur beginners ke liye simple Indian vegetarian recipes share karti hoon, jisse kitchen mein ghanton spend na karna pade.",
+  "sensitiveDomain": "none",
+  "products": [
+    {
+      "title": "15-Minute Meal Prep Guide",
+      "format": "ebook",
+      "tier": "low",
+      "tierReason": "A quick digital guide offering immediate utility, ideal as an entry-level purchase for new followers.",
+      "summary": "Busy weekdays ke liye super-fast vegetarian meal plans aur recipes.",
+      "description": "Agar office ke baad cooking bohot exhausting lagti hai, toh yeh PDF guide aapke liye hai. Isme milenge quick meal prep routines, smart hacks, aur easy dinner ideas jo 15-20 minute mein tayar ho jaayein.",
+      "whatYouGet": [
+        "PDF Guide with 25 fast Indian recipes",
+        "Weekly meal prep planner template",
+        "Grocery checklist for easy shopping"
+      ]
+    },
+    {
+      "title": "Master Everyday Cooking Workshop",
+      "format": "live_workshop",
+      "tier": "typical",
+      "tierReason": "A comprehensive live session providing interactive learning without requiring long-term commitment.",
+      "summary": "2 ghante mein seekho Indian vegetarian cooking ke core secrets.",
+      "description": "Beginners ke liye interactive live class jahan hum seekhenge basic masale balances, quick gravy bases, aur kitchen time management tricks taaki roz ka khana stress-free ban sake.",
+      "whatYouGet": [
+        "90-minute live interactive Zoom class",
+        "Q&A session to answer your kitchen doubts",
+        "Class recording access for 30 days"
+      ]
+    },
+    {
+      "title": "1-on-1 Kitchen Setup & Diet Call",
+      "format": "one_on_one",
+      "tier": "high",
+      "tierReason": "Direct access to the creator's time to build a custom routine warrants a premium tier.",
+      "summary": "Personalized cooking plan aur kitchen organization setup call.",
+      "description": "Aapki daily routine, dietary preferences, aur kitchen space ke hisaab se custom meal planning setup. Is private call mein hum aapka weekly cooking routine streamline karenge.",
+      "whatYouGet": [
+        "45-minute private call on Google Meet",
+        "Customized weekly meal routine chart",
+        "Direct WhatsApp support for 7 days"
+      ]
+    }
+  ]
+}

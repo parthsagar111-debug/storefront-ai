@@ -1,0 +1,47 @@
+{
+  "status": "ok",
+  "headline": "Tasty everyday Indian vegetarian meals in under 20 minutes",
+  "bio": "Main Ananya Sharma hoon, aur main working professionals aur beginners ko kitchen mein time bachane mein help karti hoon. Mera focus simple, tasty aur practical vegetarian home cooking par hai taaki aap office ke baad bhi aaram se fresh khana bana sakein.",
+  "sensitiveDomain": "none",
+  "products": [
+    {
+      "title": "Quick Weeknight Dinner Ebook",
+      "format": "ebook",
+      "tier": "low",
+      "tierReason": "This low tier ebook is a small, quick-win guide that acts as an easy first purchase for beginners.",
+      "summary": "15 fast vegetarian dinner recipes for busy weeknights.",
+      "description": "Office ke baad khana banane ki tension khatam. Yeh PDF guide un working professionals ke liye hai jo kam time mein tasty aur healthy dinner banana chahte hain bina zyadabartan use kiye.",
+      "whatYouGet": [
+        "PDF guide with 15 vegetarian dinner recipes",
+        "Step-by-step cooking instructions",
+        "Ingredient substitution list for pantry items"
+      ]
+    },
+    {
+      "title": "Weekly Meal Plan & Grocery Tracker",
+      "format": "template_pack",
+      "tier": "typical",
+      "tierReason": "A solid template pack offering good depth to organise weekly meals efficiently.",
+      "summary": "Ready-to-use templates to plan meals and grocery shopping easily.",
+      "description": "Roz sochna padta hai ki aaj kya banega? Yeh template pack aapko apna poore hafte ka menu aur grocery list pehle se plan karne mein help karega, jisse aapka time aur paisa dono bachega.",
+      "whatYouGet": [
+        "Printable weekly meal planner template",
+        "Smart grocery shopping checklist",
+        "Pantry inventory tracker sheet"
+      ]
+    },
+    {
+      "title": "Mastering Dals & Curries Workshop",
+      "format": "live_workshop",
+      "tier": "typical",
+      "tierReason": "A live interactive workshop provides direct value and Q and A time with the creator.",
+      "summary": "A live 90-minute session to perfect everyday Indian gravies and dals.",
+      "description": "Roz ki dal aur sabzi ko aur bhi tasty kaise banayein? Is live workshop mein hum basic tadka lagane se lekar restaurant style gravies banane tak sabhi secrets live seekhenge.",
+      "whatYouGet": [
+        "90-minute live interactive session on Zoom",
+        "Downloadable cheatsheet for spice combinations",
+        "Recording of the live session for lifetime access"
+      ]
+    }
+  ]
+}

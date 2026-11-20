@@ -1,0 +1,47 @@
+{
+  "status": "ok",
+  "headline": "Ghar ka khana, fast aur tasty – bina ghanton kitchen mein bitaye",
+  "bio": "Hey, main hoon Ananya! Main working professionals aur beginners ko simple Indian veg cooking sikhati hoon taaki aap roz fresh aur yummy khana bana sako.",
+  "sensitiveDomain": "none",
+  "products": [
+    {
+      "title": "15-Minute Veg Dinner Recipes Ebook",
+      "format": "ebook",
+      "tier": "low",
+      "tierReason": "A quick PDF guide works best as an accessible first purchase for new buyers.",
+      "summary": "Roz raat ke liye 15-minute quick veg recipes",
+      "description": "Working late? Yeh PDF guide aapko degi quick, healthy aur tasty veg recipes jo bas 15 minute mein ban jaati hain. Minimal ingredients aur zero stress.",
+      "whatYouGet": [
+        "PDF ebook with 15 quick dinner recipes",
+        "Weekly grocery shopping checklist",
+        "10 meal-prep shortcut tips"
+      ]
+    },
+    {
+      "title": "Weekly Veg Meal Prep Template Pack",
+      "format": "template_pack",
+      "tier": "typical",
+      "tierReason": "A comprehensive planner pack that offers high utility for busy professionals.",
+      "summary": "Office days ke liye complete meal planning templates",
+      "description": "Busy weeknights par cooking easy banao. In readymade planners aur trackers se aapka poora week pehle se organize ho jayega bina kisi hassle ke.",
+      "whatYouGet": [
+        "Printable weekly meal planner template",
+        "Digital pantry & fridge tracker",
+        "Batch cooking execution checklist"
+      ]
+    },
+    {
+      "title": "Master Everyday Cooking Live Workshop",
+      "format": "live_workshop",
+      "tier": "high",
+      "tierReason": "Includes live interaction and real-time guidance from the creator.",
+      "summary": "2-hour live session for effortless everyday cooking",
+      "description": "Mere saath live cooking seekho! Iss 2-hour Zoom workshop mein main aapko batayungi fast Indian cooking hacks, spices ka sahi use aur quick gravies.",
+      "whatYouGet": [
+        "2-hour live interactive session on Zoom",
+        "Live Q&A to ask your cooking doubts",
+        "Access to recording for 30 days"
+      ]
+    }
+  ]
+}

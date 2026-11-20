@@ -1,21 +1,48 @@
 @import "tailwindcss";
 
-/* Light only until the Claude Design handoff (slice 6). */
+/* "Haldi & Ink" tokens — see Design/TOKENS.md. Light only (the design has no dark theme). */
 :root {
-  --background: #fafafa;
-  --foreground: #18181b;
   color-scheme: light;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+@theme {
+  --color-paper: #fbf7f1;
+  --color-surface: #ffffff;
+  --color-sand: #f1e9de;
+  --color-line: #eadfd1;
+  --color-line-input: #e3d6c6;
+  --color-muted: #6b5d50;
+  --color-ink: #221a14;
+  --color-warn-bg: #fff3c4;
+  --color-warn-ink: #6b4a00;
+  --color-scrim: #4a4038;
+  --color-danger: #b00020;
+
+  --color-saffron: #b4500a;
+  --color-saffron-soft: #fcebdd;
+  --color-saffron-ink: #6e3106;
+  --color-teal: #0f766e;
+  --color-teal-soft: #ddf3f0;
+  --color-teal-ink: #0b4f4a;
+
+  --font-display: var(--font-bricolage), "Bricolage Grotesque", system-ui, sans-serif;
+  --font-sans: var(--font-jakarta), "Plus Jakarta Sans", system-ui, sans-serif;
+
+  --radius-card: 20px;
+  --radius-sheet: 24px;
+  --shadow-card: 0 1px 2px rgba(34, 26, 20, 0.04), 0 8px 24px rgba(34, 26, 20, 0.06);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Desktop backdrop used around the 480 px store frame (S5 / S3 at 1440). */
+.dot-grid {
+  background-color: var(--color-paper);
+  background-image: radial-gradient(rgba(107, 93, 80, 0.18) 1px, transparent 1px);
+  background-size: 20px 20px;
 }

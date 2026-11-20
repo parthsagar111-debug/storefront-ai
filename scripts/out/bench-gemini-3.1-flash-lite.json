@@ -1,0 +1,47 @@
+{
+  "status": "ok",
+  "headline": "Roz ka khana, sirf 20 minute mein",
+  "bio": "Main hoon Ananya. Kitchen mein ghanton khade rehne ka time nahi hai? Same here. Main aapko sikhata hoon practical aur tasty Indian vegetarian khana jo office ke baad fataphat ban jaaye. No fancy ingredients, bas solid home-style meals.",
+  "sensitiveDomain": "none",
+  "products": [
+    {
+      "title": "20-Minute Weeknight Meals",
+      "format": "ebook",
+      "tier": "low",
+      "tierReason": "This is a quick-win digital guide aimed at beginners looking for a low-commitment entry point.",
+      "summary": "15 quick vegetarian recipes for busy work nights.",
+      "description": "Thak kar ghar aate ho par healthy khana hai? Is ebook mein hain 15 recipes jo 20 minute se kam mein ready hoti hain. Har recipe mein step-by-step instructions hain taaki cooking stressful na lage.",
+      "whatYouGet": [
+        "PDF guide with 15 quick recipes",
+        "Weekly grocery shopping list",
+        "Tips for meal prepping vegetables"
+      ]
+    },
+    {
+      "title": "Kitchen Prep & Storage System",
+      "format": "template_pack",
+      "tier": "typical",
+      "tierReason": "A practical tool that saves significant time, justifying a mid-range price.",
+      "summary": "Everything you need to organize your kitchen and prep for the week.",
+      "description": "Kitchen ka kaam aasaan banane ke liye ye template pack hai. Ismein hai ek simple planner taaki aapki veggies fresh rahein aur aapka weekly menu sorted rahe. Kam mehnat, zyada swaad.",
+      "whatYouGet": [
+        "Digital weekly meal planner template",
+        "Vegetable storage and shelf-life guide",
+        "Pantry inventory checklist"
+      ]
+    },
+    {
+      "title": "Live Indian Cooking Workshop",
+      "format": "live_workshop",
+      "tier": "typical",
+      "tierReason": "This is a live session requiring the creator's time and direct interaction with the audience.",
+      "summary": "Learn 3 staple Indian meals in a live 90-minute session.",
+      "description": "Mere saath live cook kijiye! Is 90-minute session mein hum 3 basic but delicious meals banayenge. Aap apne sawal puch sakte hain aur saath mein technique seekh sakte hain.",
+      "whatYouGet": [
+        "90-minute interactive live session",
+        "Ingredient list sent in advance",
+        "Recording of the live session"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,70 @@
+Haldi & Ink · tokens
+Names map 1:1 to tailwind.config theme.extend
+NEUTRALS
+paper
+#FBF7F1 · page bg
+surface
+#FFFFFF · cards, sheets
+sand
+#F1E9DE · segmented bg
+line
+#EADFD1 · borders · input #E3D6C6
+muted
+#6B5D50 · secondary text
+ink
+#221A14 · primary text
+warn
+bg #FFF3C4 · text #6B4A00 · price / unpublished / save-link
+scrim
+#4A4038 · behind bottom sheets
+STORE ACCENTS · WHITE TEXT PASSES 4.5:1
+Saffron
+#B4500A · soft #FCEBDD · ink #6E3106
+Teal
+#0F766E · soft #DDF3F0 · ink #0B4F4A
+Plum
+#8E2C74 · soft #F6E3EF · ink #5E1C4C
+Indigo
+#3E46B5 · soft #E4E6F9 · ink #2A3080
+Accent colour (optional · in the header edit sheet · cut-first)
+FORMAT COVERS · 135° GRADIENT, 28PX ICON, 12PX CAPS LABEL, GHOST ICON AT 16% OPACITY
+EBOOK
+#B45309 → #78350F
+TEMPLATE PACK
+#BE185D → #831843
+RECORDED COURSE
+#4338CA → #312E81
+LIVE WORKSHOP
+#B91C1C → #7F1D1D
+COHORT
+#047857 → #064E3B
+1:1 SESSION
+#7E22CE → #4C1D95
+COMMUNITY
+#0369A1 → #0C4A6E
+TYPE
+display: Bricolage Grotesque 700 · body: Plus Jakarta Sans 400/600/700
+3xl 32/1.1
+2xl 28/1.15
+price 20–22 display
+lg 18/1.3 · card title
+base 16/1.5 · inputs, CTAs (no iOS zoom)
+sm 14/1.5 · summary, labels
+XS 12 CAPS · FORMAT LABEL
+SPACING · 4PX BASE
+1 · 4
+2 · 8 · chip gap
+3 · 12
+4 · 16 · card padding, card gap
+5 · 20 · screen gutter
+6 · 24 · form field gap
+8 · 32 · section gap
+Tap targets: min-h 44 · CTAs 52–56 · inputs 48
+RADIUS & SHADOW
+md 10–12 · inputs
+lg 14–16 · buttons
+xl 20 · cards
+2xl 24 · sheet top
+full · chips, badges
+card shadow
+Prices: Intl.NumberFormat('en-IN') → ₹1,999 · ₹99,999
