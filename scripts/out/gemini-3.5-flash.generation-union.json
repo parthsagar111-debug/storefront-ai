@@ -1,0 +1,47 @@
+{
+  "status": "ok",
+  "headline": "Busy professionals ke liye simple everyday veg cooking secrets.",
+  "bio": "Hey, main Ananya hun! Office ke baad kitchen mein ghante bitana kisi ko pasand nahi hota. Main beginners aur working professionals ki madad karti hun taaki wo kam time mein bina kisi stress ke tasty Indian veg khana bana sakein.",
+  "sensitiveDomain": "none",
+  "products": [
+    {
+      "title": "Weekly Meal Planner & Grocery Tracker",
+      "format": "template_pack",
+      "tier": "low",
+      "tierReason": "This low tier digital planner serves as a quick and affordable first purchase for new buyers.",
+      "summary": "Everyday meal planning ko simple aur stress-free banao.",
+      "description": "Working professionals ke liye specially designed planner. Isse weekly grocery shopping easy ho jayegi aur daily kya banayein ka tension khatam hoga.",
+      "whatYouGet": [
+        "Weekly meal planner in Excel and PDF",
+        "Pre-filled Indian grocery shopping checklist",
+        "15 quick meal prep ideas sheet"
+      ]
+    },
+    {
+      "title": "15-Minute Veg Cooking Guidebook",
+      "format": "ebook",
+      "tier": "typical",
+      "tierReason": "A detailed recipe collection offering clear depth for standard digital guides.",
+      "summary": "Office ke baad jhadpat banne wale tasty veg recipes.",
+      "description": "Tiring day ke baad quick aur healthy veg khana banana ab easy hai. Is PDF ebook mein 30 detailed recipes hain jo kam time aur kam bartan mein ban jaati hain.",
+      "whatYouGet": [
+        "PDF ebook with 30 quick veg recipes",
+        "Essential pantry setup guide",
+        "Indian spice mix printable chart"
+      ]
+    },
+    {
+      "title": "Batch Prep Live Masterclass",
+      "format": "live_workshop",
+      "tier": "high",
+      "tierReason": "A live interactive teaching session requiring direct creator time and effort.",
+      "summary": "Ek weekend session mein seekho poore hafte ki meal prep.",
+      "description": "Is live session mein seekho smart kitchen tricks, base gravies banakar store karna, aur weekend par poore hafte ki cooking prep niptana.",
+      "whatYouGet": [
+        "90-minute live Zoom masterclass",
+        "Recording access for 30 days",
+        "Batch prep workflow guide PDF"
+      ]
+    }
+  ]
+}

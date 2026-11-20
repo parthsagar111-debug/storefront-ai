@@ -1,0 +1,15 @@
+{
+  "product": {
+    "title": "Beginner Pantry & Kitchen Setup Pack",
+    "format": "template_pack",
+    "tier": "low",
+    "tierReason": "This low tier starter pack provides an easy and affordable entry point for beginners setting up their first kitchen.",
+    "summary": "Apni pehli kitchen setup karo bina kisi stress ke.",
+    "description": "Naye beginners aur bachelor working professionals ke liye essential kitchen guide. Isme seekho kya basic masale, utensils aur pantry items khareedne hain taaki faltu kharcha na ho aur daily cooking easy bane.",
+    "whatYouGet": [
+      "Essential Indian Pantry Checklist PDF",
+      "Basic Spice Ratio & Substitution Sheet",
+      "Kitchen Equipment Inventory Tracker in Excel"
+    ]
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "status": "ok",
+  "reason": null,
+  "question": null,
+  "directions": null,
+  "headline": "Busy days mein bhi banao tasty vegetarian khana ghar par",
+  "bio": "Main Ananya Sharma hoon! Main working professionals aur beginners ko quick, practical Indian vegetarian cooking sikhati hoon. Meri recipes se bina ghanton kitchen mein spent kiye, roz tasty khana banana seekhein.",
+  "sensitiveDomain": "none",
+  "products": [
+    {
+      "title": "Weekly Veg Meal Planner & Grocery Tracker",
+      "format": "template_pack",
+      "tier": "low",
+      "tierReason": "This template pack offers a quick win for daily planning and serves as an accessible entry product.",
+      "summary": "Office ke saath weekly meal planning karo easy aur hassle-free.",
+      "description": "Roz shaam ko 'aaj kya banayein' ki tension khatam karo. Yeh simple planner aapko poore hafte ka khana plan karne aur quick grocery shopping mein help karega.",
+      "whatYouGet": [
+        "4-Week Veg Meal Plan PDF Matrix",
+        "Categorized Grocery List Checklist",
+        "Batch Cooking Prep Schedule Template"
+      ]
+    },
+    {
+      "title": "15-Minute Veg Dinner Recipes Guide",
+      "format": "ebook",
+      "tier": "typical",
+      "tierReason": "A detailed standalone digital ebook covering complete recipes, offering standard value without creator time.",
+      "summary": "Office se aakar bas 15 minute mein banao tasty Indian dinners.",
+      "description": "Working beginners ke liye 25 fast Indian vegetarian recipes. Minimal ingredients aur simple steps ke saath roz ka khana jaldi aur tasty banao.",
+      "whatYouGet": [
+        "PDF Ebook with 25 Quick Veg Recipes",
+        "Essential Indian Spice Mix Guide",
+        "10 Meal Prep Time-Saving Hacks Sheet"
+      ]
+    },
+    {
+      "title": "Weekend Meal Prep Live Masterclass",
+      "format": "live_workshop",
+      "tier": "typical",
+      "tierReason": "Direct live interaction with real-time cooking guidance warrants standard live product pricing.",
+      "summary": "Live class mein seekho poore hafte ki cooking batching techniques.",
+      "description": "Mere saath live 90-minute session mein 5 basic gravy bases aur prep techniques seekhein. Poore hafte ki sabziyan 10 minute mein ready karne ka secret jano.",
+      "whatYouGet": [
+        "90-Minute Live Zoom Cooking Class",
+        "Ingredient List and Prep Sheet",
+        "Session Video Recording Access"
+      ]
+    }
+  ]
+}

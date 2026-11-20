@@ -1,0 +1,47 @@
+{
+  "status": "ok",
+  "headline": "Quick and easy Indian veg cooking for busy weekdays",
+  "bio": "Main Ananya Sharma hoon. Main working professionals aur beginners ko sikhati hoon kaise bina ghanto kitchen mein bitaye tasty everyday meals banayein. Agar aapke paas bhi time kam hai aur ghar ka khana khana chahte ho, toh aap sahi jagah ho.",
+  "sensitiveDomain": "none",
+  "products": [
+    {
+      "title": "20-Minute Weeknight Recipes",
+      "format": "ebook",
+      "tier": "low",
+      "tierReason": "A small and affordable PDF guide that serves as a quick entry-level purchase for beginners.",
+      "summary": "Quick dinner ideas jo 20 minute mein ban jayein.",
+      "description": "Busy office days ke baad kya banayein? Yeh ebook special unke liye hai jo kam time mein tasty veg khana banana chahte hain. Ismein milengi aasan aur jhatpat banne wali recipes jo aapki roz ki tension khatam kar dengi.",
+      "whatYouGet": [
+        "PDF guide with 15 quick dinner recipes",
+        "Step-by-step cooking instructions",
+        "Basic pantry checklist for quick meals"
+      ]
+    },
+    {
+      "title": "Weekly Meal Planner & Grocery Tracker",
+      "format": "template_pack",
+      "tier": "typical",
+      "tierReason": "A practical set of planners that saves daily planning time and offers great value for busy buyers.",
+      "summary": "Apne poore hafte ka khana pehle se plan karein.",
+      "description": "Roz sochna padta hai ki aaj kya banega? Yeh template pack aapko khana plan karne aur grocery shopping asaan banane mein help karega. Apka time aur paisa dono bachega.",
+      "whatYouGet": [
+        "Printable weekly meal planner template",
+        "Smart grocery shopping checklist",
+        "Kitchen inventory tracker sheet"
+      ]
+    },
+    {
+      "title": "1-on-1 Kitchen Setup & Meal Prep Call",
+      "format": "one_on_one",
+      "tier": "high",
+      "tierReason": "A private video consultation directly with the creator for personalised guidance.",
+      "summary": "Aapki kitchen problems ke liye personal advice.",
+      "description": "Apne schedule ke hisaab se meal prep kaise karein? Is live video call mein hum aapki specific kitchen challenges discuss karenge aur aapke liye ek easy weekly cooking routine banayenge.",
+      "whatYouGet": [
+        "One-on-one video call on Zoom for 45 minutes",
+        "Personalised weekly meal prep schedule",
+        "Direct chat support for one week after the call"
+      ]
+    }
+  ]
+}

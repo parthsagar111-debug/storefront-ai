@@ -1,0 +1,50 @@
+{
+  "status": "ok",
+  "reason": null,
+  "question": null,
+  "directions": null,
+  "headline": "Tasty everyday veg meals, bina ghanto kitchen mein bitaye",
+  "bio": "Hi, main Ananya hoon. Main working professionals aur beginners ko sikhati hoon kaise ghar ka tasty aur healthy khana jaldi banayein, bina kisi jhanjhat ke. Agar office ke baad cooking ek task lagta hai, toh aap sahi jagah aaye hain.",
+  "sensitiveDomain": "none",
+  "products": [
+    {
+      "title": "20-Minute Dinner Guide",
+      "format": "ebook",
+      "tier": "low",
+      "tierReason": "A small, quick-win guide that is very affordable for a first-time buyer on a phone.",
+      "summary": "Quick dinner recipes jo 20 minute mein ban jayein.",
+      "description": "Busy office days ke liye 15 simple vegetarian dinner recipes ka PDF guide. Isme step-by-step instructions hain taaki aap thake hone ke baad bhi jald se jald ek accha khana bana sakein.",
+      "whatYouGet": [
+        "PDF ebook with 15 quick dinner recipes",
+        "Ingredient substitution list for common items",
+        "Basic kitchen tools checklist"
+      ]
+    },
+    {
+      "title": "Weekly Meal Planner & Grocery Tracker",
+      "format": "template_pack",
+      "tier": "typical",
+      "tierReason": "A solid, ready-to-use template pack that saves daily decision fatigue.",
+      "summary": "Apne poore hafte ka khana aur grocery list pehle se plan karein.",
+      "description": "No more daily confusion about 'aaj kya banayein'. Ye ready-to-use digital templates aapko hafte bhar ke khane ki planning karne aur grocery wastage kam karne mein help karenge.",
+      "whatYouGet": [
+        "Printable weekly meal planner template",
+        "Smart grocery shopping list tracker",
+        "Kitchen inventory sheet"
+      ]
+    },
+    {
+      "title": "Sabzi & Dal Masterclass",
+      "format": "live_workshop",
+      "tier": "typical",
+      "tierReason": "A live interactive session with direct creator access provides strong value.",
+      "summary": "Roshan karein apni daily cooking ko with perfect basic recipes.",
+      "description": "Ek live 90-minute zoom session jismein main daily daal aur tasty sabziyan banane ke secret tips sikhaungi. Aap apne cooking doubts live pooch sakte hain.",
+      "whatYouGet": [
+        "90-minute live session on Zoom",
+        "Recording access for 30 days",
+        "Bonus masala cheat sheet PDF"
+      ]
+    }
+  ]
+}
