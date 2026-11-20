@@ -34,8 +34,11 @@ export async function runWithFallback<T>(opts: {
 }): Promise<{ ok: true; result: PipelineResult<T> } | { ok: false; attempts: AttemptLog[]; latencyMs: number }> {
   const t0 = Date.now();
   const remaining = () => opts.budgetMs - (Date.now() - t0);
+  // Gemini rejects deadlines < 10 s (400 INVALID_ARGUMENT), so attempt 1 always leaves the fallback
+  // ≥ 10 s + 3 s margin. Full generation (50 s): 22 s / ≤ 25 s. Section regenerate (30 s): 17 s / ≤ 10 s.
+  const MIN_DEADLINE = 10_000;
   const plan = [
-    { model: PRIMARY_MODEL(), timeout: () => Math.min(22_000, remaining()) },
+    { model: PRIMARY_MODEL(), timeout: () => Math.min(22_000, remaining() - MIN_DEADLINE - 3_000) },
     { model: FALLBACK_MODEL(), timeout: () => remaining() - 3_000 },
   ];
   const attempts: AttemptLog[] = [];
@@ -45,7 +48,7 @@ export async function runWithFallback<T>(opts: {
 
   for (const [i, step] of plan.entries()) {
     const timeoutMs = step.timeout();
-    if (timeoutMs < 2_000) break;
+    if (timeoutMs < MIN_DEADLINE) continue; // not enough time left for a valid Gemini deadline
     const a0 = Date.now();
     let text = "";
     try {
