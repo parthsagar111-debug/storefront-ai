@@ -12,7 +12,8 @@ export async function creationLimited(ipHash: string): Promise<boolean> {
     .select("id", { count: "exact", head: true })
     .eq("creator_ip_hash", ipHash)
     .gt("created_at", HOUR_AGO());
-  return (count ?? 0) >= 5;
+  const limit = Number(process.env.STORE_CREATE_LIMIT_PER_HOUR) || 5; // QA override (qa/config branch only)
+  return (count ?? 0) >= limit;
 }
 
 /** T19: one shared limit for every LLM-triggering route — 30 per store per hour. */
