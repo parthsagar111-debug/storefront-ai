@@ -34,6 +34,7 @@ function cfg(model: string, schema: Schema): GenerateContentConfig {
   return {
     systemInstruction: systemPrompt(cooking.language),
     temperature: 0.8,
+    httpOptions: { timeout: 60_000 },
     responseMimeType: "application/json",
     responseSchema: schema,
     ...(model === PRIMARY ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : {}),

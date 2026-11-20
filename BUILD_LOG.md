@@ -35,7 +35,8 @@ Per slice: what was built, problems hit, decisions made, how AI tools were used.
 
 ### Decisions
 - Extra local-only env var `SUPABASE_DB_URL` (not in SPEC §14) for applying migrations; never set on Vercel.
-- **Open (Parth):** primary model while 3.8 Flash is overloaded — see slice 0 report.
+- **Root cause found:** the Gemini key's project is on the **Free Tier** (429 `GenerateRequestsPerDayPerProjectPerModel-FreeTier`, limit 20/day for 3.8 Flash, exhausted by the retries). Free-tier traffic is also the first to get 503 under load. SPEC §7.1 already requires billing → Parth to enable billing on the AI Studio project, then re-run `scripts/model-check.ts`.
+- **Open (Parth):** if 3.8 Flash still 503s on the paid tier, choose a primary model (spec change).
 
 ### AI tools
 - Claude Code: scaffold, schema, prompt wiring, model-check script, running real calls.
