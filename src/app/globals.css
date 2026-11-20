@@ -40,8 +40,8 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Desktop backdrop used around the 480 px store frame (S5 / S3 at 1440). */
-.dot-grid {
+/* Desktop backdrop used around the 480 px store frame (S5 / S3 at 1440). @utility so `md:dot-grid` works. */
+@utility dot-grid {
   background-color: var(--color-paper);
   background-image: radial-gradient(rgba(107, 93, 80, 0.18) 1px, transparent 1px);
   background-size: 20px 20px;

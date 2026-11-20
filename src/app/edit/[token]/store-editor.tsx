@@ -1,6 +1,8 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { StoreView } from "@/components/store-view";
+import { Button, StatusBadge, Logo, btnClass } from "@/components/ui";
+import { IconPencil, IconRefresh, IconArrowUpRight, IconChevronDown, IconChevronUp, IconHand, IconChat } from "@/components/icons";
 import type { TStoreContent, TProduct } from "@/lib/ai/schemas";
 import { FORMAT_LABEL, rangeFor, formatINR, ENTRY_MAX } from "@/lib/pricing";
 import { HeaderSheet, ProductSheet, PublishSheet, type PatchFn } from "./sheets";
@@ -89,139 +91,188 @@ export default function StoreEditor({
   const anyBusy = Boolean(busy.header || busy.productId || busy.all);
   const badge = publishedAt ? (dirty ? "Unpublished changes" : "Live") : "Draft";
   const noEntry = !draft.products.some((p) => p.price <= ENTRY_MAX);
-  const ctl = "min-h-11 rounded-lg border border-zinc-300 px-3 text-sm font-medium disabled:opacity-40";
+  const editingId = sheet?.kind === "product" ? sheet.id : null;
+  const toolBase = "inline-flex min-h-11 items-center gap-1.5 rounded-xl border px-3 text-sm font-bold disabled:opacity-40";
+  const tool = `${toolBase} border-line-input bg-surface text-ink`;
 
-  const productSlot = (p: TProduct) => {
+  const editRegen = (onEdit: () => void, onRegen: () => void, editing = false, label = "") => (
+    <div className="ml-auto flex gap-2">
+      <button type="button" className={editing ? `${toolBase} border-saffron bg-saffron text-white` : tool} disabled={anyBusy} onClick={onEdit} aria-label={`Edit ${label}`}>
+        <IconPencil size={16} />
+        {editing ? "Editing" : "Edit"}
+      </button>
+      <button type="button" className={`${tool} w-11 justify-center px-0`} disabled={anyBusy} onClick={onRegen} aria-label={`Regenerate ${label}`}>
+        <IconRefresh size={18} />
+      </button>
+    </div>
+  );
+
+  const productToolbar = (p: TProduct) => (
+    <>
+      <button
+        type="button"
+        aria-expanded={why === p.id}
+        className={`inline-flex min-h-11 items-center gap-1 rounded-xl border px-3 text-sm font-bold ${
+          why === p.id ? "border-saffron bg-saffron-soft text-saffron-ink" : "border-saffron/25 bg-saffron-soft/70 text-saffron-ink"
+        }`}
+        onClick={() => setWhy(why === p.id ? null : p.id)}
+      >
+        Why {formatINR(p.price)}?
+        {why === p.id ? <IconChevronUp size={16} /> : <IconChevronDown size={16} />}
+      </button>
+      {editRegen(
+        () => setSheet({ kind: "product", id: p.id }),
+        () => regenerate({ target: "product", productId: p.id }),
+        editingId === p.id,
+        p.title,
+      )}
+    </>
+  );
+
+  const productNote = (p: TProduct) => {
+    if (why !== p.id) return null;
     const range = rangeFor(p.format);
-    const c = counts?.products[p.id];
     return (
-      <div className="space-y-2 border-t border-dashed border-zinc-200 pt-3">
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className={ctl} disabled={anyBusy} onClick={() => setSheet({ kind: "product", id: p.id })}>
-            Edit
-          </button>
-          <button type="button" className={ctl} disabled={anyBusy} onClick={() => regenerate({ target: "product", productId: p.id })}>
-            {busy.productId === p.id ? "Regenerating…" : "↻ Regenerate"}
-          </button>
-          <button type="button" className={`${ctl} bg-zinc-50`} onClick={() => setWhy(why === p.id ? null : p.id)}>
-            Why {formatINR(p.price)}?
-          </button>
-        </div>
-        {why === p.id && (
-          <div className="space-y-1 rounded-lg bg-zinc-50 p-3 text-sm text-zinc-700">
-            {p.priceSource === "creator" ? (
-              <p>You set this price.</p>
-            ) : (
-              p.tierReason && <p>{p.tierReason}</p>
-            )}
-            <p className="text-zinc-500">
-              Typical range for {FORMAT_LABEL[p.format].toLowerCase()}s: {formatINR(range.min)}–{formatINR(range.max)}
-            </p>
-          </div>
-        )}
-        {publishedAt && (
-          <p className="text-sm text-zinc-600">
-            {c?.interested ?? 0} interested · {c?.whatsapp ?? 0} WhatsApp taps
-          </p>
-        )}
+      <div className="mb-2 space-y-1 rounded-2xl bg-saffron-soft px-4 py-3 text-sm text-ink">
+        <p>{p.priceSource === "creator" ? "You set this price." : p.tierReason}</p>
+        <p className="font-bold text-saffron-ink">
+          Typical range for {FORMAT_LABEL[p.format].toLowerCase()}s: {formatINR(range.min)}–{formatINR(range.max)}
+        </p>
       </div>
     );
   };
 
-  const editingProduct = sheet?.kind === "product" ? draft.products.find((p) => p.id === sheet.id) : null;
+  const productFooter = (p: TProduct) => {
+    if (!publishedAt) return null;
+    const c = counts?.products[p.id];
+    return (
+      <div className="border-t border-line px-4 py-3 text-sm">
+        <p className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span className="inline-flex items-center gap-1.5">
+            <IconHand size={16} className="text-saffron" />
+            <b>{c?.interested ?? 0}</b> interested
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <IconChat size={16} className="text-teal" />
+            <b>{c?.whatsapp ?? 0}</b> WhatsApp taps
+          </span>
+        </p>
+        {!noteSeen && <p className="mt-1 text-xs text-muted">Taps show interest, not purchases.</p>}
+      </div>
+    );
+  };
+
+  const editingProduct = editingId ? draft.products.find((p) => p.id === editingId) : null;
+  const publishLabel = publishedAt && !dirty ? "Published" : "Publish";
 
   return (
-    <div className="space-y-4 pb-28">
-      <div className="flex items-center justify-between gap-2">
-        <span className="truncate font-semibold">{draft.creator.displayName}</span>
-        <div className="flex shrink-0 items-center gap-2">
-          <span
-            className={`rounded-full px-2 py-1 text-xs font-medium ${badge === "Live" ? "bg-emerald-100 text-emerald-800" : badge === "Draft" ? "bg-zinc-100" : "bg-amber-100 text-amber-900"}`}
-          >
-            {badge}
+    <div className="min-h-dvh">
+      {/* Top bar: mobile = name + badge + View live; ≥ md = logo, actions (D6 desktop frame). */}
+      <div className="sticky top-0 z-30 border-b border-line bg-surface/95 backdrop-blur">
+        <div className="mx-auto flex max-w-[480px] items-center gap-3 px-4 py-3 md:max-w-none md:px-6">
+          <span className="hidden md:block">
+            <Logo withName={false} />
           </span>
+          <div className="min-w-0 flex-1 md:flex md:items-center md:gap-3">
+            <p className="truncate font-bold md:text-lg">{draft.creator.displayName}</p>
+            <StatusBadge kind={badge} />
+          </div>
           {publishedAt && (
-            <a href={`/s/${slug}`} target="_blank" rel="noopener noreferrer" className="min-h-11 content-center text-sm font-medium underline">
-              View live
+            <a href={`/s/${slug}`} target="_blank" rel="noopener noreferrer" className={btnClass("secondary", "sm", "md:border-0 md:bg-transparent")}>
+              View live <IconArrowUpRight size={16} />
             </a>
+          )}
+          <div className="hidden gap-2 md:flex">
+            <Button variant="secondary" size="sm" disabled={anyBusy} onClick={() => setConfirmAll(true)}>
+              <IconRefresh size={16} />
+              {busy.all ? "Regenerating…" : "Regenerate all"}
+            </Button>
+            <Button size="sm" disabled={anyBusy} onClick={() => setSheet({ kind: "publish" })}>
+              {publishLabel}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className={`md:dot-grid md:min-h-[calc(100dvh-69px)] md:transition-[padding] ${sheet && sheet.kind !== "publish" ? "md:pr-[420px]" : ""}`}>
+        <div className="mx-auto max-w-[480px] px-3 pb-32 pt-4 md:pb-16 md:pt-8">
+          <p className="mb-4 hidden text-center text-xs font-bold uppercase tracking-wider text-muted md:block">Preview · this is what buyers see</p>
+
+          {publishedAt && counts && (
+            <p className="mb-3 px-1 text-sm text-muted">
+              <b className="text-ink">{counts.views}</b> page views
+            </p>
+          )}
+
+          <StoreView
+            variant="editor"
+            content={draft}
+            busy={busy}
+            highlightId={editingId}
+            headerToolbar={editRegen(() => setSheet({ kind: "header" }), () => regenerate({ target: "bio" }), sheet?.kind === "header", "header")}
+            productToolbar={productToolbar}
+            productNote={productNote}
+            productFooter={productFooter}
+          />
+
+          {noEntry && (
+            <p className="mt-4 rounded-2xl bg-warn-bg px-4 py-3 text-sm text-warn-ink">Most first-time buyers start with something under ₹500.</p>
           )}
         </div>
       </div>
 
-      {publishedAt && counts && (
-        <div className="rounded-xl bg-zinc-50 p-3 text-sm text-zinc-700">
-          {counts.views} page views{!noteSeen && <span className="block text-xs text-zinc-500">Taps show interest, not purchases.</span>}
-        </div>
-      )}
-
-      <StoreView
-        content={draft}
-        busy={busy}
-        headerSlot={
-          <div className="flex gap-2">
-            <button type="button" className={ctl} disabled={anyBusy} onClick={() => setSheet({ kind: "header" })}>
-              Edit
-            </button>
-            <button type="button" className={ctl} disabled={anyBusy} onClick={() => regenerate({ target: "bio" })}>
-              {busy.header ? "Regenerating…" : "↻ Regenerate"}
-            </button>
-          </div>
-        }
-        productSlot={productSlot}
-      />
-
-      {noEntry && (
-        <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Most first-time buyers start with something under ₹500.</p>
-      )}
-
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-white/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+      {/* Mobile sticky actions. */}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur md:hidden">
         <div className="mx-auto flex max-w-[480px] gap-2">
-          <button type="button" className="min-h-12 flex-1 rounded-xl border border-zinc-300 font-medium disabled:opacity-40" disabled={anyBusy} onClick={() => setConfirmAll(true)}>
-            {busy.all ? "Regenerating…" : "↻ Regenerate all"}
-          </button>
-          <button
-            type="button"
-            className="min-h-12 flex-1 rounded-xl bg-zinc-900 font-medium text-white disabled:opacity-40"
-            disabled={anyBusy}
-            onClick={() => setSheet({ kind: "publish" })}
-          >
-            {publishedAt && !dirty ? "Published" : "Publish"}
-          </button>
+          <Button variant="secondary" className="flex-1 gap-1.5 whitespace-nowrap px-3 text-[15px]" disabled={anyBusy} onClick={() => setConfirmAll(true)}>
+            <IconRefresh size={18} className="shrink-0" />
+            {busy.all ? "Regenerating…" : "Regenerate all"}
+          </Button>
+          <Button className="flex-1" disabled={anyBusy} onClick={() => setSheet({ kind: "publish" })}>
+            {publishLabel}
+          </Button>
         </div>
       </div>
 
       {confirmAll && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 md:items-center" role="dialog" aria-modal>
-          <div className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-5">
-            <p className="font-semibold">This replaces your bio and all products</p>
-            <p className="text-sm text-zinc-600">Your name, Instagram and WhatsApp stay. The live store only changes when you publish.</p>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-scrim/70 p-4 md:items-center" role="dialog" aria-modal aria-label="Regenerate all">
+          <div className="w-full max-w-sm space-y-4 rounded-[24px] bg-surface p-5">
+            <p className="font-display text-xl font-bold">This replaces your bio and all products</p>
+            <p className="text-sm text-muted">Your name, Instagram and WhatsApp stay. The live store only changes when you publish.</p>
             <div className="flex gap-2">
-              <button type="button" className="min-h-12 flex-1 rounded-xl border border-zinc-300" onClick={() => setConfirmAll(false)}>
+              <Button variant="secondary" className="flex-1" onClick={() => setConfirmAll(false)}>
                 Cancel
-              </button>
-              <button
-                type="button"
-                className="min-h-12 flex-1 rounded-xl bg-zinc-900 text-white"
+              </Button>
+              <Button
+                className="flex-1"
                 onClick={() => {
                   setConfirmAll(false);
                   regenerate({ target: "all" });
                 }}
               >
                 Regenerate all
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       )}
 
       {toast && (
-        <div className="fixed inset-x-4 bottom-24 z-50 mx-auto max-w-[440px] rounded-xl bg-zinc-900 px-4 py-3 text-sm text-white shadow-lg" role="status">
+        <div className="fixed inset-x-4 bottom-24 z-50 mx-auto max-w-[440px] rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white shadow-card md:bottom-8" role="status">
           {toast}
         </div>
       )}
 
       {sheet?.kind === "header" && <HeaderSheet draft={draft} patch={patch} onClose={() => setSheet(null)} />}
-      {editingProduct && <ProductSheet draft={draft} product={editingProduct} patch={patch} onClose={() => setSheet(null)} />}
+      {editingProduct && (
+        <ProductSheet
+          draft={draft}
+          product={editingProduct}
+          index={draft.products.findIndex((p) => p.id === editingProduct.id)}
+          patch={patch}
+          onClose={() => setSheet(null)}
+        />
+      )}
       {sheet?.kind === "publish" && (
         <PublishSheet
           draft={draft}

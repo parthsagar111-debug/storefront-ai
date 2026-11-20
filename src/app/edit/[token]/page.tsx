@@ -3,8 +3,8 @@ import Editor from "./editor";
 
 export default function EditPage({ params }: PageProps<"/edit/[token]">) {
   return (
-    <main className="mx-auto w-full max-w-[480px] flex-1 px-4 py-6">
-      <Suspense fallback={<p className="py-10 text-center text-sm text-zinc-500">Loading your store…</p>}>
+    <main className="w-full flex-1">
+      <Suspense fallback={<p className="py-10 text-center text-sm text-muted">Loading your store…</p>}>
         <Editor params={params} />
       </Suspense>
     </main>

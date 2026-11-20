@@ -1,23 +1,39 @@
 "use client";
-import { useState, type ReactNode } from "react";
+import { useState, type ReactNode, type ComponentType } from "react";
 import type { TStoreContent, TProduct } from "@/lib/ai/schemas";
 import { FORMAT_LABEL, formatINR } from "@/lib/pricing";
+import {
+  IconBook,
+  IconTemplate,
+  IconPlayCircle,
+  IconLive,
+  IconCap,
+  IconVideo,
+  IconUsers,
+  IconInstagram,
+  IconChevronDown,
+  IconChevronUp,
+  IconCheck,
+  IconSpinner,
+} from "./icons";
 
-export const THEMES: Record<TStoreContent["theme"], { accent: string; soft: string; from: string; to: string }> = {
-  saffron: { accent: "#c2410c", soft: "#fff7ed", from: "#fb923c", to: "#f59e0b" },
-  teal: { accent: "#0f766e", soft: "#f0fdfa", from: "#2dd4bf", to: "#0891b2" },
-  plum: { accent: "#7e22ce", soft: "#faf5ff", from: "#c084fc", to: "#db2777" },
-  indigo: { accent: "#4338ca", soft: "#eef2ff", from: "#818cf8", to: "#2563eb" },
+/** Store accents (TOKENS.md). White text on `accent` passes 4.5:1. */
+export const THEMES: Record<TStoreContent["theme"], { accent: string; soft: string; ink: string }> = {
+  saffron: { accent: "#B4500A", soft: "#FCEBDD", ink: "#6E3106" },
+  teal: { accent: "#0F766E", soft: "#DDF3F0", ink: "#0B4F4A" },
+  plum: { accent: "#8E2C74", soft: "#F6E3EF", ink: "#5E1C4C" },
+  indigo: { accent: "#3E46B5", soft: "#E4E6F9", ink: "#2A3080" },
 };
 
-const FORMAT_ICON: Record<TProduct["format"], string> = {
-  ebook: "📘",
-  template_pack: "🗂️",
-  recorded_course: "🎬",
-  live_workshop: "🎙️",
-  cohort_course: "👥",
-  one_on_one: "💬",
-  community: "🤝",
+/** Format covers: 135° gradient + icon (TOKENS.md). */
+const COVER: Record<TProduct["format"], { from: string; to: string; Icon: ComponentType<{ size?: number; className?: string }> }> = {
+  ebook: { from: "#B45309", to: "#78350F", Icon: IconBook },
+  template_pack: { from: "#BE185D", to: "#831843", Icon: IconTemplate },
+  recorded_course: { from: "#4338CA", to: "#312E81", Icon: IconPlayCircle },
+  live_workshop: { from: "#B91C1C", to: "#7F1D1D", Icon: IconLive },
+  cohort_course: { from: "#047857", to: "#064E3B", Icon: IconCap },
+  one_on_one: { from: "#7E22CE", to: "#4C1D95", Icon: IconVideo },
+  community: { from: "#0369A1", to: "#0C4A6E", Icon: IconUsers },
 };
 
 const initials = (name: string) =>
@@ -28,124 +44,173 @@ const initials = (name: string) =>
     .map((w) => w[0]!.toUpperCase())
     .join("");
 
-/** Mobile-first store (S5). Slots let the editor add controls without forking the layout. */
-export function StoreView({
-  content,
-  headerSlot,
-  productSlot,
-  productCta,
-  busy,
-}: {
+export interface StoreViewProps {
   content: TStoreContent;
-  /** Section being regenerated: that block pulses, the rest stays usable. */
-  busy?: { header?: boolean; productId?: string | null; all?: boolean };
-  headerSlot?: ReactNode;
-  productSlot?: (p: TProduct, index: number) => ReactNode;
+  variant: "public" | "editor";
+  /** Editor: controls above the header / each product. */
+  headerToolbar?: ReactNode;
+  productToolbar?: (p: TProduct) => ReactNode;
+  /** Editor: panel between toolbar and card (Why ₹ explanation). */
+  productNote?: (p: TProduct) => ReactNode;
+  /** Editor: footer inside the card (tap counts). */
+  productFooter?: (p: TProduct) => ReactNode;
+  /** Public: the card's CTA area. */
   productCta?: (p: TProduct) => ReactNode;
-}) {
+  busy?: { header?: boolean; productId?: string | null; all?: boolean };
+  highlightId?: string | null;
+}
+
+/** The store as buyers see it (S5); the editor (S3) renders the same component with controls. */
+export function StoreView(props: StoreViewProps) {
+  const { content, variant, busy } = props;
   const t = THEMES[content.theme];
   const c = content.creator;
-  return (
-    <div className="space-y-5" style={{ ["--accent" as string]: t.accent }}>
-      <header className={`space-y-3 ${busy?.header || busy?.all ? "pointer-events-none animate-pulse opacity-50" : ""}`}>
-        <div className="flex items-center gap-3">
-          <div
-            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-lg font-semibold text-white"
-            style={{ background: `linear-gradient(135deg, ${t.from}, ${t.to})` }}
-          >
-            {initials(c.displayName)}
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-xl font-semibold leading-tight">{c.displayName}</h1>
-            <p className="text-sm text-zinc-600">{c.headline}</p>
-            {c.instagramHandle && (
-              <a
-                className="text-sm font-medium"
-                style={{ color: t.accent }}
-                href={`https://instagram.com/${c.instagramHandle}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                @{c.instagramHandle}
-              </a>
-            )}
-          </div>
-        </div>
-        <p className="leading-relaxed text-zinc-800">{c.bio}</p>
-        {headerSlot}
-      </header>
+  const editor = variant === "editor";
+  const headerBusy = Boolean(busy?.header || busy?.all);
 
-      <section className="space-y-4">
-        {content.products.map((p, i) => (
-          <ProductCard
-            key={p.id}
-            p={p}
-            theme={t}
-            cta={productCta?.(p)}
-            slot={productSlot?.(p, i)}
-            busy={busy?.all || busy?.productId === p.id}
-          />
-        ))}
+  const header = (
+    <header className={`relative text-center ${editor ? "px-4 pb-5 pt-2" : "px-5 pb-6"}`}>
+      {!editor && <div className="absolute inset-x-0 top-0 -z-0 h-20" style={{ background: t.soft }} aria-hidden />}
+      <div className={`relative flex flex-col items-center ${editor ? "" : "pt-6"}`}>
+        <div
+          className="flex h-[88px] w-[88px] items-center justify-center rounded-full font-display text-3xl font-bold text-white ring-4 ring-white"
+          style={{ background: t.accent, boxShadow: `0 0 0 6px ${t.soft}` }}
+        >
+          {initials(c.displayName)}
+        </div>
+        <h1 className="mt-4 font-display text-[28px] font-bold leading-tight">{c.displayName}</h1>
+        <p className="mt-1 font-semibold">{c.headline}</p>
+        {c.instagramHandle && (
+          <a
+            href={`https://instagram.com/${c.instagramHandle}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold"
+            style={{ color: t.accent }}
+          >
+            <IconInstagram size={16} />@{c.instagramHandle}
+          </a>
+        )}
+        <p className="mt-3 text-left leading-relaxed text-ink/90">{c.bio}</p>
+      </div>
+    </header>
+  );
+
+  return (
+    <div className="space-y-4">
+      {editor ? (
+        <EditorBlock toolbar={props.headerToolbar} busy={headerBusy}>
+          {header}
+        </EditorBlock>
+      ) : (
+        <BusyOverlay busy={headerBusy}>{header}</BusyOverlay>
+      )}
+
+      <section className={`space-y-4 ${editor ? "" : "px-4"}`} aria-label="Products">
+        {content.products.map((p) => {
+          const card = (
+            <ProductCard
+              p={p}
+              theme={t}
+              cta={props.productCta?.(p)}
+              footer={props.productFooter?.(p)}
+              busy={Boolean(busy?.all || busy?.productId === p.id)}
+            />
+          );
+          return editor ? (
+            <EditorBlock key={p.id} toolbar={props.productToolbar?.(p)} note={props.productNote?.(p)} highlight={props.highlightId === p.id} busy={false}>
+              {card}
+            </EditorBlock>
+          ) : (
+            <div key={p.id}>{card}</div>
+          );
+        })}
       </section>
     </div>
   );
 }
 
-function ProductCard({
-  p,
-  theme,
-  cta,
-  slot,
-  busy,
-}: {
-  p: TProduct;
-  busy?: boolean;
-  theme: (typeof THEMES)[keyof typeof THEMES];
-  cta?: ReactNode;
-  slot?: ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
+/** Dashed editable region with its toolbar (S3). */
+function EditorBlock({ toolbar, note, children, busy, highlight }: { toolbar?: ReactNode; note?: ReactNode; children: ReactNode; busy: boolean; highlight?: boolean }) {
   return (
-    <article
-      className={`overflow-hidden rounded-2xl border border-zinc-200 bg-white ${busy ? "pointer-events-none animate-pulse opacity-50" : ""}`}
-    >
-      <div
-        className="relative flex h-24 items-center gap-3 px-4 text-white"
-        style={{ background: `linear-gradient(135deg, ${theme.from}, ${theme.to})` }}
-      >
-        <span className="text-3xl" aria-hidden>
-          {FORMAT_ICON[p.format]}
-        </span>
-        <span className="text-sm font-semibold uppercase tracking-wide">{FORMAT_LABEL[p.format]}</span>
-        {p.availability === "coming_soon" && (
-          <span className="absolute right-3 top-3 rounded-full bg-white/90 px-2 py-1 text-xs font-medium text-zinc-900">
-            Coming soon
+    <div className={`rounded-[24px] border border-dashed p-2 transition ${highlight ? "border-2 border-solid border-saffron" : "border-line-input"}`}>
+      {toolbar && <div className="flex items-center gap-2 pb-2">{toolbar}</div>}
+      {note}
+      <BusyOverlay busy={busy}>{children}</BusyOverlay>
+    </div>
+  );
+}
+
+/** Regenerate: dims the existing block in place with a pill on top — never renders a second card. */
+function BusyOverlay({ busy, children }: { busy: boolean; children: ReactNode }) {
+  return (
+    <div className="relative" aria-busy={busy}>
+      <div className={busy ? "pointer-events-none opacity-40 transition" : "transition"}>{children}</div>
+      {busy && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="inline-flex items-center gap-2 rounded-full bg-surface px-4 py-2 text-sm font-bold shadow-card" role="status">
+            <IconSpinner size={16} className="text-saffron" />
+            Regenerating…
           </span>
-        )}
-      </div>
-      <div className="space-y-2 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <h2 className="font-semibold leading-snug">{p.title}</h2>
-          <span className="shrink-0 font-semibold">{formatINR(p.price)}</span>
         </div>
-        <p className="text-sm text-zinc-600">{p.summary}</p>
-        {cta}
-        <button type="button" className="min-h-11 text-sm font-medium text-zinc-700 underline" onClick={() => setOpen(!open)}>
+      )}
+    </div>
+  );
+}
+
+function ProductCard({ p, theme, cta, footer, busy }: { p: TProduct; theme: (typeof THEMES)[keyof typeof THEMES]; cta?: ReactNode; footer?: ReactNode; busy: boolean }) {
+  const [open, setOpen] = useState(false);
+  const cover = COVER[p.format];
+  const available = p.availability === "available";
+  return (
+    <BusyOverlay busy={busy}>
+      <article className="overflow-hidden rounded-[20px] border border-line bg-surface shadow-card">
+        <div
+          className="relative flex h-[104px] flex-col justify-between overflow-hidden p-4 text-white"
+          style={{ background: `linear-gradient(135deg, ${cover.from}, ${cover.to})` }}
+        >
+          <cover.Icon size={28} />
+          <cover.Icon size={120} className="absolute -bottom-6 right-2 opacity-[0.16]" />
+          <span className="text-xs font-bold uppercase tracking-[0.12em]">{FORMAT_LABEL[p.format]}</span>
+          <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-bold text-ink">
+            {available && <span className="h-1.5 w-1.5 rounded-full bg-teal" />}
+            {available ? "Available now" : "Coming soon"}
+          </span>
+        </div>
+        <div className="space-y-3 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <h2 className="font-display text-lg font-bold leading-snug">{p.title}</h2>
+            <span className="shrink-0 font-display text-[21px] font-bold leading-tight">{formatINR(p.price)}</span>
+          </div>
+          <p className="text-sm leading-relaxed text-muted">{p.summary}</p>
+          {cta}
+        </div>
+        <button
+          type="button"
+          aria-expanded={open}
+          className="flex min-h-12 w-full items-center justify-center gap-1 border-t border-line text-sm font-semibold text-ink/80"
+          onClick={() => setOpen(!open)}
+        >
           {open ? "Hide details" : "See details"}
+          {open ? <IconChevronUp size={16} /> : <IconChevronDown size={16} />}
         </button>
         {open && (
-          <div className="space-y-2 text-sm text-zinc-700">
+          <div className="space-y-3 px-4 pb-4 text-sm leading-relaxed text-ink/85">
             <p>{p.description}</p>
-            <ul className="list-disc space-y-1 pl-5">
+            <p className="text-xs font-bold uppercase tracking-wider text-muted">What you get</p>
+            <ul className="space-y-2">
               {p.whatYouGet.map((w) => (
-                <li key={w}>{w}</li>
+                <li key={w} className="flex gap-2">
+                  <IconCheck size={16} className="mt-0.5 shrink-0" style={{ color: theme.accent }} />
+                  <span>{w}</span>
+                </li>
               ))}
             </ul>
-            {p.disclaimer && <p className="text-xs text-zinc-500">{p.disclaimer}</p>}
+            {p.disclaimer && <p className="rounded-lg bg-sand px-3 py-2 text-xs text-muted">{p.disclaimer}</p>}
           </div>
         )}
-        {slot}
-      </div>
-    </article>
+        {footer}
+      </article>
+    </BusyOverlay>
   );
 }

@@ -1,10 +1,20 @@
 "use client";
 import Link from "next/link";
 import { NotFoundView } from "@/components/not-found-view";
-import { use, useCallback, useEffect, useRef, useState } from "react";
+import { btnClass, inputCls } from "@/components/ui";
+import { IconAlert, IconCheck, IconChevronLeft, IconChevronRight, IconLoader, IconRefresh } from "@/components/icons";
+import { use, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import StoreEditor, { type Counts } from "./store-editor";
 import type { EditorView } from "@/lib/server/store-access";
 import { saveStore, listStores } from "@/lib/client/device";
+
+const AUDIENCE_LABEL: Record<string, string> = {
+  none: "No audience yet",
+  under_5k: "Under 5K",
+  "5k_20k": "5K–20K",
+  "20k_100k": "20K–100K",
+  "100k_plus": "100K+",
+};
 
 const LINES = [
   "Reading what you do…",
@@ -79,14 +89,27 @@ export default function Editor({ params }: { params: Promise<{ token: string }> 
   };
 
   if (s.status === "failed" || s.isStale) {
+    const i = s.input;
     return (
-      <div className="space-y-4 py-10 text-center">
-        <h1 className="text-xl font-semibold">Our AI is busy right now.</h1>
-        <p className="text-zinc-600">Your answers are saved.</p>
-        <button className="min-h-12 w-full rounded-xl bg-zinc-900 text-white" onClick={() => restart("retry")}>
-          Try again
-        </button>
-      </div>
+      <Screen>
+        <div className="flex min-h-[70dvh] flex-col justify-center gap-5">
+          <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#E4E6F9] text-[#3E46B5]">
+            <IconLoader size={28} />
+          </span>
+          <div className="space-y-2">
+            <h1 className="font-display text-[28px] font-bold leading-tight">Our AI is busy right now.</h1>
+            <p className="text-muted">Your answers are saved.</p>
+          </div>
+          <p className="flex gap-2 rounded-2xl border border-line bg-surface p-4 text-sm">
+            <IconCheck size={16} className="mt-0.5 shrink-0 text-teal" />
+            <span>{[i.name, i.expertise, AUDIENCE_LABEL[i.audienceSize], i.language === "hinglish" ? "Hinglish" : "English"].filter(Boolean).join(" · ")}</span>
+          </p>
+          <button type="button" className={btnClass("primary", "lg", "w-full")} onClick={() => restart("retry")}>
+            <IconRefresh size={20} />
+            Try again
+          </button>
+        </div>
+      </Screen>
     );
   }
 
@@ -94,13 +117,20 @@ export default function Editor({ params }: { params: Promise<{ token: string }> 
 
   if (s.status === "needs_input" && s.followUp?.kind === "unclear") {
     return (
-      <div className="space-y-4 py-10">
-        <h1 className="text-xl font-semibold">We couldn&apos;t understand that.</h1>
-        <p className="text-zinc-600">Try something like &quot;I teach home cooking to working women.&quot;</p>
-        <Link href={`/?from=${encodeURIComponent(token)}`} className="block min-h-12 rounded-xl bg-zinc-900 py-3 text-center text-white">
-          Edit my answers
-        </Link>
-      </div>
+      <Screen>
+        <div className="flex min-h-[70dvh] flex-col justify-center gap-5">
+          <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-saffron-soft text-saffron">
+            <IconAlert size={28} />
+          </span>
+          <div className="space-y-2">
+            <h1 className="font-display text-[28px] font-bold leading-tight">We couldn&apos;t understand that.</h1>
+            <p className="text-muted">Try something like &quot;I teach home cooking to working women.&quot;</p>
+          </div>
+          <Link href={`/?from=${encodeURIComponent(token)}`} className={btnClass("primary", "lg", "w-full")}>
+            Edit my answers
+          </Link>
+        </div>
+      </Screen>
     );
   }
 
@@ -134,7 +164,7 @@ function Generating({ since }: { since: string }) {
   const [i, setI] = useState(0);
   const [slow, setSlow] = useState(false);
   useEffect(() => {
-    const t = setInterval(() => setI((x) => (x + 1) % LINES.length), 2500);
+    const t = setInterval(() => setI((x) => Math.min(x + 1, LINES.length - 1)), 2500);
     const started = new Date(since).getTime();
     const s = setInterval(() => setSlow(Date.now() - started > 20_000), 1000);
     return () => {
@@ -142,41 +172,63 @@ function Generating({ since }: { since: string }) {
       clearInterval(s);
     };
   }, [since]);
-  return <Skeleton line={slow ? "Taking a little longer than usual…" : LINES[i]} />;
+  return <Skeleton line={slow ? "Taking a little longer than usual…" : LINES[i]} step={slow ? LINES.length - 1 : i} slow={slow} />;
 }
 
-function Skeleton({ line }: { line: string }) {
-  const bar = "animate-pulse rounded bg-zinc-200";
+/** S2: progress header + store-shaped skeleton (not a spinner). */
+function Skeleton({ line, step = 0, slow = false }: { line: string; step?: number; slow?: boolean }) {
+  const bar = "animate-pulse rounded-full bg-sand";
   return (
-    <div className="space-y-5" aria-busy>
-      <p className="text-center text-sm font-medium text-zinc-600" aria-live="polite">
-        {line}
-      </p>
-      <div className="flex items-center gap-3">
-        <div className={`h-14 w-14 rounded-full ${bar}`} />
-        <div className="flex-1 space-y-2">
-          <div className={`h-4 w-1/2 ${bar}`} />
-          <div className={`h-3 w-3/4 ${bar}`} />
-        </div>
-      </div>
-      <div className="space-y-2">
-        <div className={`h-3 ${bar}`} />
-        <div className={`h-3 ${bar}`} />
-        <div className={`h-3 w-2/3 ${bar}`} />
-      </div>
-      {[0, 1, 2].map((k) => (
-        <div key={k} className="overflow-hidden rounded-2xl border border-zinc-200">
-          <div className={`h-24 ${bar} rounded-none`} />
-          <div className="space-y-2 p-4">
-            <div className={`h-4 w-2/3 ${bar}`} />
-            <div className={`h-3 ${bar}`} />
+    <div aria-busy>
+      <div className="sticky top-0 z-10 border-b border-line bg-surface">
+        <div className="mx-auto max-w-[480px] space-y-3 px-5 py-4">
+          <p className="flex items-start gap-2.5 font-bold leading-snug" aria-live="polite">
+            <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${slow ? "bg-saffron/40" : "animate-pulse bg-saffron"}`} />
+            {line}
+          </p>
+          <div className="grid grid-cols-4 gap-1.5">
+            {LINES.map((_, k) => (
+              <span key={k} className={`h-1 rounded-full ${k <= step ? "bg-saffron" : "bg-sand"}`} />
+            ))}
           </div>
         </div>
-      ))}
+      </div>
+      <Screen>
+        <div className="flex flex-col items-center gap-3 pt-6">
+          <div className="h-[72px] w-[72px] animate-pulse rounded-full bg-sand" />
+          <div className={`h-4 w-40 ${bar}`} />
+          <div className={`h-3 w-60 ${bar}`} />
+        </div>
+        <div className="mt-6 space-y-2">
+          <div className={`h-3 ${bar}`} />
+          <div className={`h-3 ${bar}`} />
+          <div className={`h-3 w-2/3 ${bar}`} />
+        </div>
+        <div className="mt-6 space-y-4">
+          {[0, 1, 2].map((k) => (
+            <div key={k} className="overflow-hidden rounded-[20px] border border-line bg-surface">
+              <div className="h-24 animate-pulse bg-sand" />
+              <div className="space-y-3 p-4">
+                <div className="flex justify-between gap-6">
+                  <div className={`h-4 w-2/3 ${bar}`} />
+                  <div className={`h-4 w-14 ${bar}`} />
+                </div>
+                <div className={`h-3 ${bar}`} />
+                {k === 0 && <div className="h-11 animate-pulse rounded-2xl bg-sand" />}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Screen>
     </div>
   );
 }
 
+function Screen({ children }: { children: ReactNode }) {
+  return <div className="mx-auto w-full max-w-[480px] px-5 py-6">{children}</div>;
+}
+
+/** S2b: a chip selects; "Use this" submits the selection (or the typed description). */
 function PickDirection({
   question,
   directions,
@@ -188,34 +240,76 @@ function PickDirection({
   allowText: boolean;
   onPick: (d: string) => void;
 }) {
+  const [chosen, setChosen] = useState<string | null>(null);
   const [text, setText] = useState("");
+  const value = chosen ?? (allowText && text.trim().length >= 2 ? text.trim() : null);
   return (
-    <div className="space-y-4 py-6">
-      <h1 className="text-xl font-semibold">{question}</h1>
-      <div className="space-y-2">
-        {directions.map((d) => (
-          <button key={d} className="min-h-12 w-full rounded-xl border border-zinc-300 px-4 py-3 text-left" onClick={() => onPick(d)}>
-            {d}
-          </button>
-        ))}
-      </div>
-      {!allowText && <p className="text-sm text-zinc-600">Pick the one closest to what you do.</p>}
-      <div className={allowText ? "space-y-2" : "hidden"}>
-        <input
-          className="w-full rounded-xl border border-zinc-300 px-3 py-3"
-          placeholder="or describe it yourself"
-          value={text}
-          maxLength={500}
-          onChange={(e) => setText(e.target.value)}
-        />
-        <button
-          disabled={text.trim().length < 2}
-          className="min-h-12 w-full rounded-xl bg-zinc-900 text-white disabled:opacity-40"
-          onClick={() => onPick(text.trim())}
-        >
-          Continue
+    <Screen>
+      <div className="space-y-5">
+        <Link href="/" aria-label="Back" className="-ml-2 flex h-11 w-11 items-center justify-center rounded-full text-ink active:bg-sand">
+          <IconChevronLeft size={22} />
+        </Link>
+        <span className="inline-block rounded-full bg-saffron-soft px-3 py-1 text-xs font-bold uppercase tracking-wider text-saffron-ink">
+          One quick question
+        </span>
+        <div className="space-y-2">
+          <h1 className="font-display text-[28px] font-bold leading-tight">{question}</h1>
+          <p className="text-muted">Pick the one closest to you. A specific direction gets you a much better store.</p>
+        </div>
+        <div className="space-y-2" role="radiogroup" aria-label="Directions">
+          {directions.map((d) => {
+            const on = chosen === d;
+            return (
+              <button
+                key={d}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                className={`flex min-h-14 w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left font-semibold transition ${
+                  on ? "border-2 border-saffron bg-saffron-soft text-saffron-ink" : "border-line-input bg-surface"
+                }`}
+                onClick={() => {
+                  setChosen(on ? null : d);
+                  setText("");
+                }}
+              >
+                <span>{d}</span>
+                {on ? <IconCheck size={20} className="shrink-0 text-saffron" /> : <IconChevronRight size={20} className="shrink-0 text-saffron" />}
+              </button>
+            );
+          })}
+        </div>
+        {allowText ? (
+          <>
+            <div className="flex items-center gap-3 text-sm text-muted">
+              <span className="h-px flex-1 bg-line" />
+              or
+              <span className="h-px flex-1 bg-line" />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="f-direction" className="block text-sm font-bold">
+                Describe it yourself
+              </label>
+              <textarea
+                id="f-direction"
+                rows={3}
+                className={inputCls()}
+                value={text}
+                maxLength={500}
+                onChange={(e) => {
+                  setText(e.target.value);
+                  if (e.target.value) setChosen(null);
+                }}
+              />
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-muted">Pick the one closest to what you do.</p>
+        )}
+        <button type="button" disabled={!value} className={btnClass("primary", "lg", "w-full")} onClick={() => value && onPick(value)}>
+          Use this
         </button>
       </div>
-    </div>
+    </Screen>
   );
 }

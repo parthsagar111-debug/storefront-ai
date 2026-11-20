@@ -1,6 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Chip, ChoiceChip, Segmented, Logo, btnClass, inputCls } from "@/components/ui";
+import { IconArrowUpRight, IconPlus, IconX, IconAlert } from "@/components/icons";
 import {
   listStores,
   saveStore,
@@ -124,111 +127,184 @@ export default function CreateForm() {
     );
   }
 
-  const input = "w-full rounded-xl border border-zinc-300 bg-white px-3 py-3 text-base outline-none focus:border-zinc-900";
-  const chip = "min-h-11 rounded-full border border-zinc-300 px-3 py-2 text-sm active:bg-zinc-100";
-  const chipOn = "min-h-11 rounded-full border border-zinc-900 bg-zinc-900 px-3 py-2 text-sm text-white";
+  const label = "block text-sm font-bold";
 
   if (onceLink) {
     return (
-      <div className="space-y-3 rounded-2xl border border-amber-300 bg-amber-50 p-4">
-        <p className="font-medium">Your store is being created.</p>
-        <p className="text-sm">Your browser is blocking storage. Your edit link will only be shown once; copy it before leaving.</p>
-        <p className="break-all rounded-lg bg-white p-2 font-mono text-sm">{location.origin + onceLink}</p>
-        <a className="block rounded-xl bg-zinc-900 py-3 text-center text-white" href={onceLink}>
-          Open my store
-        </a>
+      <div className="space-y-4 px-5 py-10">
+        <Logo />
+        <div className="space-y-3 rounded-2xl border border-warn-ink/20 bg-warn-bg p-4 text-warn-ink">
+          <p className="font-bold">Your store is being created.</p>
+          <p className="text-sm">Your browser is blocking storage. Your edit link will only be shown once; copy it before leaving.</p>
+          <p className="break-all rounded-lg bg-surface p-3 font-mono text-sm text-ink">{location.origin + onceLink}</p>
+          <a className={btnClass("primary", "md", "w-full")} href={onceLink}>
+            Open my store
+          </a>
+        </div>
       </div>
     );
   }
 
+  const fields = [
+    ["expertise", "What are you good at?"],
+    ["audience", "Who do you help?"],
+    ["outcome", "What do they get from you?"],
+  ] as const;
+
   return (
-    <div className="space-y-6">
-      {recent && (
-        <a href={`/edit/${recent.token}`} className="block rounded-xl bg-zinc-100 px-4 py-3 text-sm font-medium">
-          Continue your store ({recent.name}) →
-        </a>
-      )}
-      {noStorage && (
-        <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
-          Your browser is blocking storage. Your edit link will only be shown once; copy it before leaving.
-        </p>
-      )}
+    <form
+      className="flex min-h-dvh flex-col"
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+    >
+      {/* scroll-margin keeps a focused field above the sticky Create button when the keyboard is open. */}
+      <div className="flex-1 space-y-6 px-5 pb-6 pt-5 [&_input]:scroll-mb-32 [&_input]:scroll-mt-4">
 
-      <label className="block space-y-2">
-        <span className="font-medium">Your name</span>
-        <input className={input} value={v.name} maxLength={500} onChange={(e) => setV({ ...v, name: e.target.value })} />
-      </label>
+        <Logo />
+        {recent && (
+          <Link
+            href={`/edit/${recent.token}`}
+            className="flex min-h-12 items-center justify-between gap-3 rounded-2xl bg-saffron-soft px-4 py-3 text-sm font-bold text-saffron-ink"
+          >
+            <span className="truncate">Continue your store · {recent.name}</span>
+            <IconArrowUpRight size={16} className="shrink-0" />
+          </Link>
+        )}
+        <header className="space-y-2">
+          <h1 className="font-display text-[32px] font-bold leading-[1.1]">Turn what you know into a store people buy from.</h1>
+          <p className="text-muted">A few quick answers. Your store in about a minute.</p>
+        </header>
+        {noStorage && (
+          <p className="flex gap-2 rounded-xl bg-warn-bg p-3 text-sm text-warn-ink">
+            <IconAlert size={18} className="shrink-0" />
+            Your browser is blocking storage. Your edit link will only be shown once; copy it before leaving.
+          </p>
+        )}
 
-      {(
-        [
-          ["expertise", "What are you good at?"],
-          ["audience", "Who do you help?"],
-          ["outcome", "What do they get from you?"],
-        ] as const
-      ).map(([k, label]) => (
-        <div key={k} className="space-y-2">
-          <label className="block space-y-2">
-            <span className="font-medium">{label}</span>
-            <input className={input} value={v[k]} maxLength={500} onChange={(e) => setV({ ...v, [k]: e.target.value })} />
+        <div className="space-y-2">
+          <label htmlFor="f-name" className={label}>
+            Your name
           </label>
+          <input
+            id="f-name"
+            className={inputCls()}
+            value={v.name}
+            maxLength={500}
+            autoComplete="name"
+            enterKeyHint="next"
+            onChange={(e) => setV({ ...v, name: e.target.value })}
+          />
+        </div>
+
+        {fields.map(([k, text]) => (
+          <div key={k} className="space-y-2">
+            <label htmlFor={`f-${k}`} className={label}>
+              {text}
+            </label>
+            <input
+              id={`f-${k}`}
+              className={inputCls()}
+              value={v[k]}
+              maxLength={500}
+              enterKeyHint="next"
+              onChange={(e) => setV({ ...v, [k]: e.target.value })}
+            />
+            <div className="flex flex-wrap gap-2">
+              {CHIPS[k].map((c) => (
+                <Chip key={c} selected={v[k] === c} onClick={() => setV({ ...v, [k]: c })}>
+                  {c}
+                </Chip>
+              ))}
+            </div>
+          </div>
+        ))}
+
+        <fieldset className="space-y-2">
+          <legend className={`${label} pb-2`}>How many people follow you?</legend>
           <div className="flex flex-wrap gap-2">
-            {CHIPS[k].map((c) => (
-              <button key={c} type="button" className={chip} onClick={() => setV({ ...v, [k]: c })}>
-                {c}
-              </button>
+            {SIZES.map(([k, text]) => (
+              <ChoiceChip key={k} selected={size === k} onClick={() => setSize(k)}>
+                {text}
+              </ChoiceChip>
             ))}
           </div>
-        </div>
-      ))}
+        </fieldset>
 
-      <div className="space-y-2">
-        <span className="font-medium">Audience size</span>
-        <div className="flex flex-wrap gap-2">
-          {SIZES.map(([k, label]) => (
-            <button key={k} type="button" className={size === k ? chipOn : chip} onClick={() => setSize(k)}>
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <span className="font-medium">Language</span>
-        <div className="flex gap-2">
-          {(
-            [
+        <div className="space-y-2">
+          <span className={label}>Store language</span>
+          <Segmented
+            label="Store language"
+            value={lang}
+            onChange={setLang}
+            options={[
               ["en", "English"],
               ["hinglish", "Hinglish"],
-            ] as const
-          ).map(([k, label]) => (
-            <button key={k} type="button" className={lang === k ? chipOn : chip} onClick={() => setLang(k)}>
-              {label}
-            </button>
-          ))}
+            ]}
+          />
         </div>
+
+        <div className="border-t border-line pt-2">
+          {showInsta ? (
+            <div className="space-y-2 pt-2">
+              <div className="flex items-center justify-between">
+                <label htmlFor="f-insta" className={label}>
+                  Instagram handle <span className="font-medium text-muted">(optional)</span>
+                </label>
+                <button
+                  type="button"
+                  aria-label="Remove Instagram handle"
+                  className="flex min-h-11 min-w-11 items-center justify-center text-muted"
+                  onClick={() => {
+                    setInsta("");
+                    setShowInsta(false);
+                  }}
+                >
+                  <IconX size={18} />
+                </button>
+              </div>
+              <div className="flex overflow-hidden rounded-xl border border-line-input bg-surface focus-within:border-saffron">
+                <span className="flex items-center bg-sand px-3 text-muted">@</span>
+                <input
+                  id="f-insta"
+                  className="min-h-12 w-full px-3 text-base outline-none"
+                  value={insta.replace(/^@/, "")}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  onChange={(e) => setInsta(e.target.value)}
+                />
+              </div>
+              <p className="text-xs text-muted">Shown as a link on your store. We never read your profile.</p>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="flex min-h-12 w-full items-center justify-between text-left font-bold"
+              onClick={() => setShowInsta(true)}
+            >
+              <span>
+                Instagram handle <span className="font-medium text-muted">(optional)</span>
+              </span>
+              <IconPlus size={20} />
+            </button>
+          )}
+        </div>
+
+        {error && (
+          <p className="flex gap-2 rounded-xl bg-red-50 p-3 text-sm text-danger" role="alert">
+            <IconAlert size={18} className="shrink-0" />
+            {error}
+          </p>
+        )}
       </div>
 
-      {showInsta ? (
-        <label className="block space-y-2">
-          <span className="font-medium">Instagram handle (optional)</span>
-          <input className={input} value={insta} placeholder="@yourhandle" onChange={(e) => setInsta(e.target.value)} />
-        </label>
-      ) : (
-        <button type="button" className="min-h-11 text-sm text-zinc-600 underline" onClick={() => setShowInsta(true)}>
-          + Add Instagram handle (optional)
+      {/* Sticky CTA: stays reachable above the keyboard at 360 px (viewport uses interactive-widget=resizes-content). */}
+      <div className="sticky bottom-0 z-10 bg-gradient-to-t from-paper via-paper/95 to-paper/0 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4">
+        <button type="submit" disabled={!valid || busy} className={btnClass("primary", "lg", "w-full")}>
+          {busy ? "Creating…" : "Create my store"}
         </button>
-      )}
-
-      {error && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p>}
-
-      <button
-        type="button"
-        disabled={!valid || busy}
-        onClick={submit}
-        className="min-h-12 w-full rounded-xl bg-zinc-900 py-3 text-base font-medium text-white disabled:opacity-40"
-      >
-        {busy ? "Creating…" : "Create my store"}
-      </button>
-    </div>
+      </div>
+    </form>
   );
 }

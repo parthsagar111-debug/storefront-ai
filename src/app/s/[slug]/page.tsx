@@ -40,8 +40,8 @@ async function Store({ params }: { params: Promise<{ slug: string }> }) {
 
 export default function PublicStorePage({ params }: PageProps<"/s/[slug]">) {
   return (
-    <main className="mx-auto w-full max-w-[480px] flex-1 px-4 py-6">
-      <Suspense fallback={<p className="py-10 text-center text-sm text-zinc-500">Loading…</p>}>
+    <main className="w-full flex-1">
+      <Suspense fallback={<p className="py-10 text-center text-sm text-muted">Loading…</p>}>
         <Store params={params} />
       </Suspense>
     </main>
