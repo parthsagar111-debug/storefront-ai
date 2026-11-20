@@ -5,15 +5,17 @@ import { IconStore } from "./icons";
 type Variant = "primary" | "secondary" | "ghost" | "teal" | "soft";
 
 export function btnClass(variant: Variant = "primary", size: "md" | "lg" | "sm" = "md", extra = "") {
+  // Disabled primary is solid (not translucent) so a sticky CTA never shows content through it.
   const v: Record<Variant, string> = {
-    primary: "bg-saffron text-white shadow-[0_6px_16px_rgba(180,80,10,0.25)] active:brightness-95",
-    secondary: "border border-line-input bg-surface text-ink active:bg-sand",
-    ghost: "text-ink active:bg-sand",
-    teal: "bg-teal text-white active:brightness-95",
-    soft: "border border-saffron/30 bg-saffron-soft text-saffron-ink active:brightness-95",
+    primary:
+      "bg-saffron text-white shadow-[0_6px_16px_rgba(180,80,10,0.25)] active:brightness-95 disabled:bg-[#E8DCCD] disabled:text-muted disabled:shadow-none",
+    secondary: "border border-line-input bg-surface text-ink active:bg-sand disabled:opacity-40",
+    ghost: "text-ink active:bg-sand disabled:opacity-40",
+    teal: "bg-teal text-white active:brightness-95 disabled:opacity-40",
+    soft: "border border-saffron/30 bg-saffron-soft text-saffron-ink active:brightness-95 disabled:opacity-40",
   };
   const s = { sm: "min-h-11 px-3 text-sm rounded-xl", md: "min-h-12 px-4 text-base rounded-2xl", lg: "min-h-14 px-5 text-lg rounded-2xl" }[size];
-  return `inline-flex items-center justify-center gap-2 font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${s} ${v[variant]} ${extra}`;
+  return `inline-flex items-center justify-center gap-2 font-bold transition disabled:cursor-not-allowed ${s} ${v[variant]} ${extra}`;
 }
 
 export function Button({ variant, size, className, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: "md" | "lg" | "sm" }) {

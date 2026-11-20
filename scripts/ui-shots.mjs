@@ -30,7 +30,8 @@ async function smallTargets(page, label) {
   const ctx = await browser.newContext(mobile);
   const page = await ctx.newPage();
   await page.goto(BASE + "/", { waitUntil: "networkidle" });
-  await page.screenshot({ path: `${OUT}/S1-360.png`, fullPage: true });
+  // Viewport capture: a full-page capture paints the sticky Create button mid-page (screenshot artifact).
+  await page.screenshot({ path: `${OUT}/S1-360.png` });
   await noHScroll(page, "S1");
   await smallTargets(page, "S1");
   // Keyboard open ≈ the layout viewport shrinks (interactive-widget=resizes-content). Simulate 360×420 with a field focused.
