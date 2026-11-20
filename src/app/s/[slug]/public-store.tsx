@@ -122,7 +122,7 @@ export default function PublicStore({ slug, content }: { slug: string; content: 
       <StoreView content={content} productCta={cta} />
       <footer className="border-t border-zinc-200 pt-4 text-center text-sm text-zinc-500">
         Made with Storefront AI ·{" "}
-        <Link href="/" className="font-medium text-zinc-800 underline">
+        <Link href="/" className="inline-flex min-h-11 items-center font-medium text-zinc-800 underline">
           Create your own store
         </Link>
       </footer>
