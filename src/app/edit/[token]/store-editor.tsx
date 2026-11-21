@@ -8,6 +8,8 @@ import type { TStoreContent, TProduct } from "@/lib/ai/schemas";
 import { FORMAT_LABEL, rangeFor, formatINR, ENTRY_MAX } from "@/lib/pricing";
 import { HeaderSheet, ProductSheet, PublishSheet, type PatchFn } from "./sheets";
 import { removeStore } from "@/lib/client/device";
+import PublicStore from "@/app/s/[slug]/public-store";
+import { inputCls } from "@/components/ui";
 
 export interface Counts {
   views: number;
@@ -15,6 +17,14 @@ export interface Counts {
 }
 
 type Busy = { header?: boolean; productId?: string | null; all?: boolean };
+type RegenBody = { target: "bio"; hint?: string } | { target: "product"; productId: string; hint?: string } | { target: "all" };
+/** V4: what an Undo puts back (sent as PATCH `restore`). */
+type Restore =
+  | { headline: string; bio: string }
+  | { product: { replaceId: string; value: TProduct } }
+  | { headline: string; bio: string; products: TProduct[]; sensitiveDomain: TStoreContent["sensitiveDomain"] };
+const UNDO_MS = 10_000;
+const HINT_MAX = 120;
 
 const CHANGED_ELSEWHERE = "This store changed in another tab. Refresh to see the latest.";
 
@@ -50,6 +60,12 @@ export default function StoreEditor({
   const [deleting, setDeleting] = useState(false);
   const [deleted, setDeleted] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  // V4: 10 s "Regenerated. Undo" after any regenerate.
+  const [undo, setUndo] = useState<{ restore: Restore; until: number } | null>(null);
+  // V4: regenerate asks for an optional "What should change?" hint (bio / product).
+  const [regenAsk, setRegenAsk] = useState<{ target: "bio" } | { target: "product"; productId: string; title: string } | null>(null);
+  const [hint, setHint] = useState("");
+  const [buyerView, setBuyerView] = useState(false);
   const [why, setWhy] = useState<string | null>(null);
   const [noteSeen, setNoteSeen] = useState(true);
   // IQA-01: the draft revision this tab last saw; every write sends it and the server returns the next one.
@@ -75,6 +91,12 @@ export default function StoreEditor({
     setTimeout(() => setToast(null), 3500);
   }
 
+  useEffect(() => {
+    if (!undo) return;
+    const t = setTimeout(() => setUndo(null), Math.max(0, undo.until - Date.now()));
+    return () => clearTimeout(t);
+  }, [undo]);
+
   const api = `/api/stores/${encodeURIComponent(token)}`;
 
   const patch: PatchFn = useCallback(
@@ -92,13 +114,16 @@ export default function StoreEditor({
       draftRevs.set(token, b.draftRev);
       setDraft(b.draft);
       setDirty(b.hasUnpublishedChanges);
+      setUndo(null); // any later change ends the undo window
       return { ok: true };
     },
     [api, token, initialRev],
   );
 
-  const regenerate = async (body: { target: "bio" } | { target: "product"; productId: string } | { target: "all" }) => {
+  const regenerate = async (body: RegenBody) => {
     setBusy(body.target === "bio" ? { header: true } : body.target === "product" ? { productId: body.productId } : { all: true });
+    setUndo(null);
+    const before = draft; // snapshot for Undo
     try {
       const res = await fetch(`${api}/regenerate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const b = await res.json().catch(() => ({}));
@@ -110,11 +135,42 @@ export default function StoreEditor({
         if (typeof b.draftRev === "number") draftRevs.set(token, b.draftRev);
         setDraft(b.draft);
         setDirty(b.hasUnpublishedChanges);
+        const next: TStoreContent = b.draft;
+        let restore: Restore | null = null;
+        if (body.target === "bio") restore = { headline: before.creator.headline, bio: before.creator.bio };
+        else if (body.target === "product") {
+          const i = before.products.findIndex((p) => p.id === body.productId);
+          const fresh = next.products[i];
+          if (i >= 0 && fresh && fresh.id !== body.productId) restore = { product: { replaceId: fresh.id, value: before.products[i] } };
+        } else
+          restore = { headline: before.creator.headline, bio: before.creator.bio, products: before.products, sensitiveDomain: before.sensitiveDomain };
+        if (restore) setUndo({ restore, until: Date.now() + UNDO_MS });
       }
     } catch {
       flash("Couldn't regenerate, kept your previous version.");
     }
     setBusy({});
+  };
+
+  const undoRegenerate = async () => {
+    if (!undo) return;
+    const r = await patch({ restore: undo.restore });
+    setUndo(null);
+    flash(r.ok ? "Restored your previous version." : r.error === "changed_elsewhere" ? CHANGED_ELSEWHERE : "Couldn't undo. Your store has changed since.");
+  };
+
+  const removeProduct = async (id: string): Promise<string | null> => {
+    const r = await patch({ removeProductId: id });
+    if (r.ok) {
+      setSheet(null);
+      flash("Product removed.");
+      return null;
+    }
+    return r.error === "only_entry"
+      ? "This is your only product under ₹500. Keep it so new buyers have an easy first purchase."
+      : r.error === "changed_elsewhere"
+        ? CHANGED_ELSEWHERE
+        : "Couldn't remove the product. Please try again.";
   };
 
   const deleteStore = async () => {
@@ -169,7 +225,10 @@ export default function StoreEditor({
       </button>
       {editRegen(
         () => setSheet({ kind: "product", id: p.id }),
-        () => regenerate({ target: "product", productId: p.id }),
+        () => {
+          setHint("");
+          setRegenAsk({ target: "product", productId: p.id, title: p.title });
+        },
         editingId === p.id,
         p.title,
         `Regenerate product: ${p.title}`, // SPEC v4.5 S3 accessible name
@@ -207,7 +266,7 @@ export default function StoreEditor({
         <p className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <span className="inline-flex items-center gap-1.5">
             <IconHand size={16} className="text-saffron" />
-            <b>{c?.interested ?? 0}</b> interested
+            <b>{c?.interested ?? 0}</b> interested taps
           </span>
           <span className="inline-flex items-center gap-1.5">
             <IconChat size={16} className="text-teal" />
@@ -221,6 +280,8 @@ export default function StoreEditor({
 
   const editingProduct = editingId ? draft.products.find((p) => p.id === editingId) : null;
   const publishLabel = publishedAt && !dirty ? "Published" : "Publish";
+  const editAnswersHref = `/?edit=${encodeURIComponent(token)}`;
+  const menuItem = "flex min-h-11 w-full items-center px-4 text-left text-sm font-bold text-ink active:bg-sand disabled:opacity-40";
 
   if (deleted) {
     return (
@@ -236,32 +297,40 @@ export default function StoreEditor({
 
   return (
     <div className="min-h-dvh">
-      {/* Top bar: mobile = name + badge + View live; ≥ md = logo, actions (D6 desktop frame). */}
+      {/* Top bar. Phone (< 768): name + badge + Publish + ⋯ (V4). ≥ md: logo, name, badge, actions (unchanged). */}
       <div className="sticky top-0 z-30 border-b border-line bg-surface/95 backdrop-blur">
-        <div className="mx-auto flex max-w-[480px] items-center gap-3 px-4 py-3 md:max-w-none md:px-6">
+        <div className="mx-auto flex max-w-[480px] items-center gap-2 px-4 py-3 md:max-w-none md:gap-3 md:px-6">
           <span className="hidden md:block">
             <Logo withName={false} />
           </span>
-          <div className="min-w-0 flex-1 md:flex md:items-center md:gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3">
             <p className="min-w-0 truncate font-bold md:text-lg">{draft.creator.displayName}</p>
             <StatusBadge kind={badge} />
           </div>
+          {/* Desktop only (wrappers, since the button classes set their own display). */}
           {publishedAt && (
-            <a
-              href={`/s/${slug}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="View live"
-              className={btnClass("secondary", "sm", "min-w-11 px-0 sm:px-3 md:border-0 md:bg-transparent")}
-            >
-              <span className="hidden sm:inline">View live</span> <IconArrowUpRight size={16} />
-            </a>
+            <span className="hidden md:contents">
+              <a
+                href={`/s/${slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="View live"
+                className={btnClass("secondary", "sm", "border-0 bg-transparent")}
+              >
+                View live <IconArrowUpRight size={16} />
+              </a>
+            </span>
           )}
-          {/* T28: new answers for the same store/token → confirm → regenerate (S1 in edit mode). */}
-          <Link href={`/?edit=${encodeURIComponent(token)}`} className={btnClass("secondary", "sm", "shrink-0 whitespace-nowrap")}>
-            Edit answers
-          </Link>
-          {/* T29: overflow menu */}
+          {/* T28 / V4: new answers for the same store/token → confirm → regenerate (S1 in edit mode). */}
+          <span className="hidden md:contents">
+            <Link href={editAnswersHref} className={btnClass("secondary", "sm", "shrink-0 whitespace-nowrap")}>
+              Start over / Edit answers
+            </Link>
+          </span>
+          <Button size="sm" className="shrink-0 md:hidden" disabled={anyBusy} onClick={() => setSheet({ kind: "publish" })}>
+            {publishLabel}
+          </Button>
+          {/* T29 / V4 overflow menu */}
           <div className="relative">
             <button
               type="button"
@@ -274,11 +343,42 @@ export default function StoreEditor({
               ⋯
             </button>
             {menuOpen && (
-              <div role="menu" className="absolute right-0 top-full z-40 mt-2 w-48 overflow-hidden rounded-2xl border border-line bg-surface py-1 shadow-card">
+              <div role="menu" className="absolute right-0 top-full z-40 mt-2 w-60 overflow-hidden rounded-2xl border border-line bg-surface py-1 shadow-card">
+                <Link role="menuitem" href={editAnswersHref} className={`${menuItem} md:hidden`} onClick={() => setMenuOpen(false)}>
+                  Start over / Edit answers
+                </Link>
                 <button
                   type="button"
                   role="menuitem"
-                  className="flex min-h-11 w-full items-center px-4 text-left text-sm font-bold text-danger active:bg-sand"
+                  disabled={anyBusy}
+                  className={`${menuItem} md:hidden`}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setConfirmAll(true);
+                  }}
+                >
+                  {busy.all ? "Regenerating…" : "Regenerate all"}
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={menuItem}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setBuyerView(true);
+                  }}
+                >
+                  View as buyer
+                </button>
+                {publishedAt && (
+                  <a role="menuitem" href={`/s/${slug}`} target="_blank" rel="noopener noreferrer" className={`${menuItem} md:hidden`} onClick={() => setMenuOpen(false)}>
+                    View live store
+                  </a>
+                )}
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={`${menuItem} text-danger`}
                   onClick={() => {
                     setMenuOpen(false);
                     setConfirmDelete(true);
@@ -302,8 +402,8 @@ export default function StoreEditor({
       </div>
 
       <div className={`md:dot-grid md:min-h-[calc(100dvh-69px)] md:transition-[padding] ${sheet && sheet.kind !== "publish" ? "md:pr-[420px]" : ""}`}>
-        <div className="mx-auto max-w-[480px] px-3 pb-32 pt-4 md:pb-16 md:pt-8">
-          <p className="mb-4 hidden text-center text-xs font-bold uppercase tracking-wider text-muted md:block">Preview · this is what buyers see</p>
+        <div className="mx-auto max-w-[480px] px-3 pb-24 pt-4 md:pb-16 md:pt-8">
+          <p className="mb-4 text-center text-xs font-bold uppercase tracking-wider text-muted">Your store preview</p>
 
           {publishedAt && counts && (
             <p className="mb-3 px-1 text-sm text-muted">
@@ -316,7 +416,21 @@ export default function StoreEditor({
             content={draft}
             busy={busy}
             highlightId={editingId}
-            headerToolbar={editRegen(() => setSheet({ kind: "header" }), () => regenerate({ target: "bio" }), sheet?.kind === "header", "header", "Regenerate bio")}
+            headerToolbar={editRegen(
+              () => setSheet({ kind: "header" }),
+              () => {
+                setHint("");
+                setRegenAsk({ target: "bio" });
+              },
+              sheet?.kind === "header",
+              "header",
+              "Regenerate bio",
+            )}
+            beforeProducts={
+              <p className="px-2 text-sm text-muted">
+                Prices are starting suggestions based on format and your audience. Tap Why ₹X? or edit any price.
+              </p>
+            }
             productToolbar={productToolbar}
             productNote={productNote}
             productFooter={productFooter}
@@ -325,19 +439,6 @@ export default function StoreEditor({
           {noEntry && (
             <p className="mt-4 rounded-2xl bg-warn-bg px-4 py-3 text-sm text-warn-ink">Most first-time buyers start with something under ₹500.</p>
           )}
-        </div>
-      </div>
-
-      {/* Mobile sticky actions. */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur md:hidden">
-        <div className="mx-auto flex max-w-[480px] gap-2">
-          <Button variant="secondary" className="flex-1 gap-1.5 whitespace-nowrap px-3 text-[15px]" disabled={anyBusy} onClick={() => setConfirmAll(true)}>
-            <IconRefresh size={18} className="shrink-0" />
-            {busy.all ? "Regenerating…" : "Regenerate all"}
-          </Button>
-          <Button className="flex-1" disabled={anyBusy} onClick={() => setSheet({ kind: "publish" })}>
-            {publishLabel}
-          </Button>
         </div>
       </div>
 
@@ -381,8 +482,72 @@ export default function StoreEditor({
         </div>
       )}
 
+      {regenAsk && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-scrim/70 p-4 md:items-center" role="dialog" aria-modal aria-labelledby="regen-title">
+          <form
+            className="w-full max-w-sm space-y-4 rounded-[24px] bg-surface p-5"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const h = hint.trim() || undefined;
+              const ask = regenAsk;
+              setRegenAsk(null);
+              regenerate(ask.target === "bio" ? { target: "bio", hint: h } : { target: "product", productId: ask.productId, hint: h });
+            }}
+          >
+            <p id="regen-title" className="font-display text-xl font-bold [overflow-wrap:anywhere]">
+              {regenAsk.target === "bio" ? "New headline and bio" : `New version of “${regenAsk.title}”`}
+            </p>
+            <div className="space-y-2">
+              <label htmlFor="regen-hint" className="block text-sm font-bold">
+                What should change? <span className="font-medium text-muted">(optional)</span>
+              </label>
+              <input
+                id="regen-hint"
+                className={inputCls()}
+                value={hint}
+                maxLength={HINT_MAX}
+                placeholder={regenAsk.target === "bio" ? "e.g. shorter, more friendly" : "e.g. cheaper, for beginners, a live format"}
+                onChange={(e) => setHint(e.target.value)}
+              />
+              <p className="text-right text-xs text-muted">
+                {hint.length}/{HINT_MAX}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="secondary" className="flex-1" onClick={() => setRegenAsk(null)}>
+                Cancel
+              </Button>
+              <button type="submit" className={btnClass("primary", "md", "flex-1")}>
+                Regenerate
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {buyerView && (
+        <div className="fixed inset-0 z-[60] overflow-y-auto bg-paper" role="dialog" aria-modal aria-label="Buyer view of your draft">
+          <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-line bg-ink px-4 py-2 text-sm text-paper">
+            <span className="font-semibold">Buyer view of your draft</span>
+            <button type="button" className="min-h-11 font-bold underline underline-offset-4" onClick={() => setBuyerView(false)}>
+              Back to editing
+            </button>
+          </div>
+          <PublicStore slug={slug} content={draft} preview />
+        </div>
+      )}
+
+      {undo && !toast && (
+        <div className="fixed inset-x-4 bottom-20 z-50 mx-auto flex max-w-[440px] items-center justify-between gap-3 rounded-2xl bg-ink px-4 py-2 text-sm font-semibold text-white shadow-card" role="status">
+          <span>Regenerated.</span>
+          <button type="button" className="min-h-11 px-2 font-bold underline underline-offset-4" onClick={undoRegenerate}>
+            Undo
+          </button>
+        </div>
+      )}
+
       {toast && (
-        <div className="fixed inset-x-4 bottom-24 z-50 mx-auto max-w-[440px] rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white shadow-card md:bottom-8" role="status">
+        <div className="fixed inset-x-4 bottom-20 z-50 mx-auto max-w-[440px] rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white shadow-card md:bottom-8" role="status">
           {toast}
         </div>
       )}
@@ -394,6 +559,7 @@ export default function StoreEditor({
           product={editingProduct}
           index={draft.products.findIndex((p) => p.id === editingProduct.id)}
           patch={patch}
+          onRemove={removeProduct}
           onClose={() => setSheet(null)}
         />
       )}

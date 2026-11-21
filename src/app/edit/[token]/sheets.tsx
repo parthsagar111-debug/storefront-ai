@@ -5,7 +5,7 @@ import { Button, Segmented, SectionLabel, btnClass, inputCls } from "@/component
 import { IconAlert, IconChat, IconCheck, IconCopy, IconEye, IconLock } from "@/components/icons";
 import type { TStoreContent, TProduct } from "@/lib/ai/schemas";
 import { FORMATS } from "@/lib/ai/schemas";
-import { FORMAT_LABEL, PRICE_TABLE, rangeFor, formatINR } from "@/lib/pricing";
+import { FORMAT_LABEL, PRICE_TABLE, rangeFor, formatINR, ENTRY_MAX } from "@/lib/pricing";
 import { normalizeIndianMobile } from "@/lib/whatsapp";
 
 /** QA-09: warn before leaving the page while a sheet has unsaved changes. */
@@ -160,12 +160,15 @@ export function ProductSheet({
   index,
   onClose,
   patch,
+  onRemove,
 }: {
   draft: TStoreContent;
   product: TProduct;
   index: number;
   onClose: () => void;
   patch: PatchFn;
+  /** V4: Remove product (while more than 2). Resolves to an error message, or null when removed. */
+  onRemove?: (id: string) => Promise<string | null>;
 }) {
   const [initial] = useState(() => ({
     availability: product.availability,
@@ -188,6 +191,12 @@ export function ProductSheet({
   const needsNumber = v.availability === "available" && !draft.creator.whatsapp;
   const usedFormats = draft.products.filter((p) => p.id !== product.id).map((p) => p.format);
   const formatName = FORMAT_LABEL[v.format].toLowerCase();
+  // V4: a format change re-prices only an AI price the creator hasn't touched in this sheet.
+  const aiPrice = product.priceSource === "ai_tier" && v.price === initial.price;
+  const [removeStep, setRemoveStep] = useState<"idle" | "confirm" | "busy">("idle");
+  const [removeErr, setRemoveErr] = useState<string | null>(null);
+  const canRemove = Boolean(onRemove) && draft.products.length > 2;
+  const onlyEntry = product.price <= ENTRY_MAX && !draft.products.some((p) => p.id !== product.id && p.price <= ENTRY_MAX);
 
   const save = async () => {
     if (!priceValid) return setBad("price");
@@ -253,7 +262,11 @@ export function ProductSheet({
       <Field label="Title" htmlFor="p-title" error={bad === "title" ? FIELD_MSG.title : null}>
         <input id="p-title" className={inputCls(bad === "title")} value={v.title} onChange={set("title")} maxLength={60} />
       </Field>
-      <Field label="Format" htmlFor="p-format" hint="Changing format resets the price to its typical tier.">
+      <Field
+        label="Format"
+        htmlFor="p-format"
+        hint={product.priceSource === "ai_tier" ? "Changing format moves the price to the new format's typical price." : "Your price stays when you change format. Check the suggested range below."}
+      >
         <select
           id="p-format"
           className={`${inputCls()} appearance-none bg-[length:16px] bg-[right_1rem_center] bg-no-repeat`}
@@ -261,7 +274,7 @@ export function ProductSheet({
           value={v.format}
           onChange={(e) => {
             const f = e.target.value as TProduct["format"];
-            setV({ ...v, format: f, price: String(PRICE_TABLE[f].typical) });
+            setV({ ...v, format: f, price: aiPrice ? String(PRICE_TABLE[f].typical) : v.price });
           }}
         >
           {FORMATS.map((f) => (
@@ -317,6 +330,45 @@ export function ProductSheet({
       </Field>
       {bad === "form" && <p className="text-sm text-danger">Couldn&apos;t save. Please check the fields.</p>}
       {bad === "conflict" && <p className="text-sm font-semibold text-danger">{CONFLICT_MSG}</p>}
+
+      {canRemove && (
+        <div className="space-y-2 border-t border-line pt-4">
+          {onlyEntry ? (
+            <p className="text-sm text-muted">
+              You can&apos;t remove this product: it&apos;s your only one under ₹500, and new buyers usually start with something cheap.
+            </p>
+          ) : removeStep === "idle" ? (
+            <button type="button" className="min-h-11 text-sm font-bold text-danger underline underline-offset-4" onClick={() => setRemoveStep("confirm")}>
+              Remove product
+            </button>
+          ) : (
+            <div className="space-y-3 rounded-2xl border border-danger/20 bg-red-50 p-3">
+              <p className="text-sm font-semibold text-ink">Remove “{product.title}” from your store?</p>
+              <div className="flex gap-2">
+                <Button variant="secondary" size="sm" className="flex-1" disabled={removeStep === "busy"} onClick={() => setRemoveStep("idle")}>
+                  Keep it
+                </Button>
+                <button
+                  type="button"
+                  disabled={removeStep === "busy"}
+                  className={btnClass("primary", "sm", "flex-1 bg-danger! shadow-none!")}
+                  onClick={async () => {
+                    setRemoveStep("busy");
+                    const err = await onRemove!(product.id);
+                    if (err) {
+                      setRemoveErr(err);
+                      setRemoveStep("idle");
+                    }
+                  }}
+                >
+                  {removeStep === "busy" ? "Removing…" : "Remove"}
+                </button>
+              </div>
+            </div>
+          )}
+          {removeErr && <p className="text-sm font-semibold text-danger" role="alert">{removeErr}</p>}
+        </div>
+      )}
     </Sheet>
   );
 }

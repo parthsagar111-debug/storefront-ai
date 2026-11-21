@@ -54,6 +54,8 @@ export interface StoreViewProps {
   productNote?: (p: TProduct) => ReactNode;
   /** Editor: footer inside the card (tap counts). */
   productFooter?: (p: TProduct) => ReactNode;
+  /** Editor: a line between the header and the products (V4 price note). */
+  beforeProducts?: ReactNode;
   /** Public: the card's CTA area. */
   productCta?: (p: TProduct) => ReactNode;
   busy?: { header?: boolean; productId?: string | null; all?: boolean };
@@ -106,6 +108,7 @@ export function StoreView(props: StoreViewProps) {
         <BusyOverlay busy={headerBusy}>{header}</BusyOverlay>
       )}
 
+      {props.beforeProducts}
       <section className={`space-y-4 ${editor ? "" : "px-4"}`} aria-label="Products">
         {content.products.map((p) => {
           const card = (

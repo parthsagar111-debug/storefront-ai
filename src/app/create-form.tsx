@@ -338,7 +338,7 @@ function CreateFormInner() {
             <Link href={`/edit/${editToken}`} className="inline-flex min-h-11 items-center text-sm font-semibold text-saffron underline underline-offset-4">
               ← Back to my store
             </Link>
-            <h1 className="font-display text-[32px] font-bold leading-[1.1]">Edit your answers</h1>
+            <h1 className="font-display text-[32px] font-bold leading-[1.1]">{editHasDraft ? "Start over / Edit answers" : "Edit your answers"}</h1>
             <p className="text-muted">Same store, same link. Your published page stays as it is until you publish again.</p>
           </header>
         ) : (
@@ -467,7 +467,7 @@ function CreateFormInner() {
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-scrim/70 p-4 md:items-center" role="dialog" aria-modal aria-label="Regenerate with new answers">
           <div className="w-full max-w-sm space-y-4 rounded-[24px] bg-surface p-5">
             <p className="font-display text-xl font-bold">Regenerate your store?</p>
-            <p className="text-sm text-muted">This replaces your bio and all products. Your published page stays as it is until you publish again.</p>
+            <p className="text-sm text-muted">This replaces your bio and all products, including your edits. Your live page stays as it is until you publish again.</p>
             <div className="flex gap-2">
               <button type="button" className={btnClass("secondary", "md", "flex-1")} onClick={() => setConfirmOpen(false)}>
                 Cancel

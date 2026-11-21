@@ -30,7 +30,11 @@ function loadTapped(slug: string): string[] {
   }
 }
 
-export default function PublicStore({ slug, content }: { slug: string; content: TStoreContent }) {
+/**
+ * `preview` (V4 "View as buyer"): the creator's draft in the public component — no events are sent and the
+ * CTAs are inert (they look the same but do nothing).
+ */
+export default function PublicStore({ slug, content, preview = false }: { slug: string; content: TStoreContent; preview?: boolean }) {
   const vid = useRef<string>("");
   const [tapped, setTapped] = useState<string[]>([]);
   // IQA-02: per-product send state; "Thanks!" only after the server confirms.
@@ -40,7 +44,9 @@ export default function PublicStore({ slug, content }: { slug: string; content: 
   const t = THEMES[content.theme];
 
   const send = (type: string, productId?: string) =>
-    fetch("/api/events", {
+    preview
+      ? Promise.resolve()
+      : fetch("/api/events", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ slug, type, productId, visitorId: vid.current }),
@@ -48,6 +54,7 @@ export default function PublicStore({ slug, content }: { slug: string; content: 
     }).catch(() => {});
 
   useEffect(() => {
+    if (preview) return;
     vid.current = visitorId();
     const timer = setTimeout(() => setTapped(loadTapped(slug)), 0);
     send("store_viewed");
@@ -88,7 +95,8 @@ export default function PublicStore({ slug, content }: { slug: string; content: 
   const link = "inline-flex min-h-11 items-center text-sm font-semibold underline underline-offset-4";
 
   // Exactly one primary action per card: Available now → Enquire on WhatsApp; Coming soon → I'm interested.
-  const cta = (p: TProduct) => {
+  const cta = (p: TProduct) => (preview ? <div inert>{liveCta(p)}</div> : liveCta(p));
+  const liveCta = (p: TProduct) => {
     if (p.availability === "available" && c.whatsapp) {
       return (
         <a
@@ -160,7 +168,7 @@ export default function PublicStore({ slug, content }: { slug: string; content: 
     <div className="min-h-dvh md:dot-grid md:py-16">
       <div className="mx-auto w-full max-w-[480px] overflow-hidden bg-paper md:rounded-[28px] md:bg-surface md:shadow-[0_24px_80px_rgba(34,26,20,0.14)]">
         <StoreView variant="public" content={content} productCta={cta} />
-        <footer className="mt-8 border-t border-line px-5 py-5 text-center text-sm text-muted">
+        <footer {...(preview ? { inert: true } : {})} className="mt-8 border-t border-line px-5 py-5 text-center text-sm text-muted">
           Made with Storefront AI ·{" "}
           <Link href="/" className="inline-flex min-h-11 items-center font-semibold text-ink underline underline-offset-4">
             Create your own store
