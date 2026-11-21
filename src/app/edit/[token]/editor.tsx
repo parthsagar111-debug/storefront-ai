@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { NotFoundView } from "@/components/not-found-view";
 import { btnClass, inputCls } from "@/components/ui";
-import { IconAlert, IconCheck, IconChevronLeft, IconChevronRight, IconLoader, IconRefresh } from "@/components/icons";
+import { IconAlert, IconCheck, IconChevronRight, IconLoader, IconPencil, IconRefresh } from "@/components/icons";
 import { use, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import StoreEditor, { type Counts } from "./store-editor";
 import type { EditorView } from "@/lib/server/store-access";
@@ -26,7 +26,6 @@ const statusLine = (audience?: string) => {
   return `Finding products for ${lower}…`;
 };
 const SLOW_AFTER_MS = 12_000;
-const TIP_KEY = "sf.tip.edit.v1";
 
 /** navigator.onLine with live updates (V3: offline → "You're offline. Reconnect to continue."). */
 function useOnline() {
@@ -63,6 +62,9 @@ function EditorInner({ params }: { params: Promise<{ token: string }> }) {
   const online = useOnline();
   // V3: fade into the editor only when this view watched the generation finish.
   const [sawGenerating, setSawGenerating] = useState(false);
+  // V3 + design: going offline while loading / generating shows the offline screen until "Try again" (online only).
+  const [offlineHold, setOfflineHold] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
 
   const fetchStore = useCallback(async (): Promise<Load | null> => {
     try {
@@ -91,9 +93,16 @@ function EditorInner({ params }: { params: Promise<{ token: string }> }) {
     load.state === "loading" ||
     (load.state === "ok" && (load.store.status === "pending" || load.store.status === "generating") && !load.store.isStale);
 
+  useEffect(() => {
+    if (!online && active) {
+      const t = setTimeout(() => setOfflineHold(true), 0);
+      return () => clearTimeout(t);
+    }
+  }, [online, active]);
+
   // Fetch now (first load), then every 2 s while generating; stop otherwise.
   useEffect(() => {
-    if (!active) return;
+    if (!active || offlineHold) return;
     let cancelled = false;
     const run = () =>
       fetchStore().then((next) => {
@@ -107,9 +116,20 @@ function EditorInner({ params }: { params: Promise<{ token: string }> }) {
       cancelled = true;
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [load, active, fetchStore]);
+  }, [load, active, fetchStore, offlineHold, retryKey]);
 
-  if (load.state === "loading") return <Skeleton line={online ? "Loading your store…" : OFFLINE} offline={!online} />;
+  if (offlineHold)
+    return (
+      <Offline
+        online={online}
+        onRetry={() => {
+          setOfflineHold(false);
+          setRetryKey((k) => k + 1);
+        }}
+      />
+    );
+
+  if (load.state === "loading") return <Skeleton line="Loading your store…" />;
   if (load.state === "missing") return <NotFoundView />;
 
   const s = load.store;
@@ -125,10 +145,28 @@ function EditorInner({ params }: { params: Promise<{ token: string }> }) {
     setLoad({ state: "ok", store: { ...s, status: "generating", isStale: false, genStartedAt: new Date().toISOString() } });
   };
 
-  if (s.status === "failed" || s.isStale) {
+  if (s.isStale && s.status !== "failed") {
+    // V3 interrupted (Claude Design v5 frame): heading + Try again.
+    return (
+      <Screen>
+        <div className="flex min-h-[80dvh] flex-col justify-center gap-6 pb-20">
+          <span className="flex h-[72px] w-[72px] items-center justify-center rounded-[22px] bg-saffron-soft text-saffron" aria-hidden>
+            <IconAlert size={30} />
+          </span>
+          <h1 role="alert" className="font-display text-[28px] font-bold leading-[1.15]">
+            Generation was interrupted.
+          </h1>
+          <button type="button" disabled={!online} className={btnClass("primary", "lg", "w-full")} onClick={() => restart("retry")}>
+            <IconRefresh size={20} />
+            Try again
+          </button>
+        </div>
+      </Screen>
+    );
+  }
+
+  if (s.status === "failed") {
     const i = s.input;
-    // V3: a stale/interrupted run gets its own message; a failed run keeps S2c "busy".
-    const interrupted = s.isStale && s.status !== "failed";
     return (
       <Screen>
         <div className="flex min-h-[70dvh] flex-col justify-center gap-5">
@@ -136,10 +174,8 @@ function EditorInner({ params }: { params: Promise<{ token: string }> }) {
             <IconLoader size={28} />
           </span>
           <div className="space-y-2">
-            <h1 className="font-display text-[28px] font-bold leading-tight">
-              {interrupted ? "Generation was interrupted. Try again." : "Our AI is busy right now."}
-            </h1>
-            <p className="text-muted">{online ? "Your answers are saved." : OFFLINE}</p>
+            <h1 className="font-display text-[28px] font-bold leading-tight">Our AI is busy right now.</h1>
+            <p className="text-muted">Your answers are saved.</p>
           </div>
           <p className="flex gap-2 rounded-2xl border border-line bg-surface p-4 text-sm">
             <IconCheck size={16} className="mt-0.5 shrink-0 text-teal" />
@@ -155,7 +191,7 @@ function EditorInner({ params }: { params: Promise<{ token: string }> }) {
   }
 
   if (s.status === "pending" || s.status === "generating") {
-    return <Generating since={s.genStartedAt ?? s.updatedAt} name={s.input?.name} audience={s.input?.audience} online={online} />;
+    return <Generating since={s.genStartedAt ?? s.updatedAt} name={s.input?.name} audience={s.input?.audience} />;
   }
 
   if (s.status === "needs_input" && s.followUp?.kind === "unclear") {
@@ -202,14 +238,13 @@ function EditorInner({ params }: { params: Promise<{ token: string }> }) {
         draftRev={s.draftRev}
         counts={s.counts}
         />
-        <EditTip />
       </FadeIn>
     );
   }
   return <Skeleton line="Loading…" />;
 }
 
-function Generating({ since, name, audience, online }: { since: string; name?: string; audience?: string; online: boolean }) {
+function Generating({ since, name, audience }: { since: string; name?: string; audience?: string }) {
   const [slow, setSlow] = useState(false);
   useEffect(() => {
     const started = new Date(since).getTime();
@@ -218,8 +253,7 @@ function Generating({ since, name, audience, online }: { since: string; name?: s
     const t = setInterval(tick, 1000);
     return () => clearInterval(t);
   }, [since]);
-  const line = !online ? OFFLINE : slow ? "Taking a little longer…" : statusLine(audience);
-  return <Skeleton line={line} name={name} offline={!online} />;
+  return <Skeleton line={slow ? "Taking a little longer…" : statusLine(audience)} name={name} />;
 }
 
 /** V3: 200–300 ms fade from the generating skeleton into the editor. */
@@ -233,59 +267,66 @@ function FadeIn({ enabled, children }: { enabled: boolean; children: ReactNode }
   return <div className={`transition-opacity duration-[250ms] ease-out motion-reduce:transition-none ${shown ? "opacity-100" : "opacity-0"}`}>{children}</div>;
 }
 
-/** V3: one-time tip; dismissal remembered on this device (storage can be blocked → just don't remember). */
-function EditTip() {
-  const [show, setShow] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => {
-      try {
-        setShow(localStorage.getItem(TIP_KEY) !== "1");
-      } catch {
-        setShow(true);
-      }
-    }, 0);
-    return () => clearTimeout(t);
-  }, []);
-  if (!show) return null;
-  const dismiss = () => {
-    setShow(false);
-    try {
-      localStorage.setItem(TIP_KEY, "1");
-    } catch {}
-  };
+/** V3 offline (Claude Design v5 frame); "Try again" works only once the browser is back online. */
+function Offline({ online, onRetry }: { online: boolean; onRetry: () => void }) {
   return (
-    <div role="status" className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-[480px] px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-      <div className="flex items-center gap-3 rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-paper shadow-lg">
-        <span className="flex-1">Tap Edit on anything to change it</span>
-        <button type="button" onClick={dismiss} className="min-h-11 shrink-0 rounded-xl px-3 font-bold underline underline-offset-4">
-          Got it
+    <Screen>
+      <div className="flex min-h-[80dvh] flex-col justify-center gap-5 pb-20">
+        <span className="flex h-[72px] w-[72px] items-center justify-center rounded-[22px] bg-sand text-ink/70" aria-hidden>
+          <IconAlert size={30} />
+        </span>
+        <div role="status" className="space-y-2">
+          <h1 className="font-display text-[28px] font-bold leading-[1.15]">You&apos;re offline.</h1>
+          <p className="text-muted">Reconnect to continue.</p>
+        </div>
+        <button type="button" disabled={!online} className={btnClass("primary", "lg", "w-full")} onClick={onRetry}>
+          <IconRefresh size={20} />
+          Try again
         </button>
       </div>
-    </div>
+    </Screen>
   );
 }
 
 /** S2: progress header + store-shaped skeleton (not a spinner). */
-function Skeleton({ line, name, offline = false }: { line: string; name?: string; offline?: boolean }) {
+const initialsOf = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]!.toUpperCase())
+    .join("");
+
+function Skeleton({ line, name }: { line: string; name?: string }) {
   const bar = "animate-pulse rounded-full bg-sand";
   return (
     <div aria-busy>
       <div className="sticky top-0 z-10 border-b border-line bg-surface">
-        <div className="mx-auto max-w-[480px] space-y-3 px-5 py-4">
-          <p className="flex items-start gap-2.5 font-bold leading-snug" aria-live="polite">
-            <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${offline ? "bg-danger" : "animate-pulse bg-saffron"}`} />
+        <div className="mx-auto max-w-[480px] space-y-3 px-5 pb-4 pt-[18px]">
+          <p className="font-semibold leading-snug" role="status" aria-live="polite">
             {line}
           </p>
-          {/* V3: indeterminate indicator (no step bar). */}
-          <div className="relative h-1 overflow-hidden rounded-full bg-sand" role="progressbar" aria-label="Creating your store">
-            {!offline && <span className="absolute inset-y-0 w-1/3 rounded-full bg-saffron motion-safe:animate-[indeterminate_1.4s_ease-in-out_infinite]" />}
+          {/* V3: indeterminate indicator (no step bar); v5 token: 40 % accent segment, 1.3 s ease-in-out. */}
+          <div className="relative h-1 overflow-hidden rounded bg-sand" role="progressbar" aria-label="Creating your store">
+            <span className="absolute inset-y-0 left-0 w-2/5 rounded bg-saffron motion-safe:animate-[indeterminate_1.3s_ease-in-out_infinite]" />
           </div>
         </div>
       </div>
       <Screen>
         <div className="flex flex-col items-center gap-3 pt-6">
-          <div className="h-[72px] w-[72px] animate-pulse rounded-full bg-sand" />
-          {name ? <p className="font-display text-2xl font-bold">{name}</p> : <div className={`h-4 w-40 ${bar}`} />}
+          {name ? (
+            <>
+              <div className="flex h-[72px] w-[72px] items-center justify-center rounded-full bg-saffron font-display text-[26px] font-bold text-white ring-4 ring-saffron-soft" aria-hidden>
+                {initialsOf(name)}
+              </div>
+              <p className="font-display text-[22px] font-bold">{name}</p>
+            </>
+          ) : (
+            <>
+              <div className="h-[72px] w-[72px] animate-pulse rounded-full bg-sand" />
+              <div className={`h-4 w-40 ${bar}`} />
+            </>
+          )}
           <div className={`h-3 w-60 ${bar}`} />
         </div>
         <div className="mt-6 space-y-2">
@@ -339,27 +380,24 @@ function PickDirection({
   return (
     <Screen>
       <div className="space-y-5">
-        <Link href="/" aria-label="Back" className="-ml-2 flex h-11 w-11 items-center justify-center rounded-full text-ink active:bg-sand">
-          <IconChevronLeft size={22} />
-        </Link>
+        {/* V3 + design: compact summary of their answers; editing re-runs the clarity check for this same store. */}
+        <div className="flex min-h-14 items-center justify-between gap-3 rounded-2xl border border-line bg-surface px-4 py-3 text-sm">
+          <p className="min-w-0 [overflow-wrap:anywhere]">
+            <span className="text-muted">I teach </span>
+            <b>{summary.teach}</b>
+            <span className="text-muted"> · to </span>
+            <b>{summary.to}</b>
+          </p>
+          <Link href={`/?edit=${encodeURIComponent(token)}`} className="inline-flex min-h-11 shrink-0 items-center gap-1 font-bold text-saffron">
+            <IconPencil size={16} />
+            Edit
+          </Link>
+        </div>
         <span className="inline-block rounded-full bg-saffron-soft px-3 py-1 text-xs font-bold uppercase tracking-wider text-saffron-ink">
           One quick question
         </span>
         <div className="space-y-2">
           <h1 className="font-display text-[28px] font-bold leading-tight">{question}</h1>
-          <p className="text-muted">Pick the one closest to you. A specific direction gets you a much better store.</p>
-        </div>
-        {/* V3: compact summary of their answers; editing re-runs the clarity check for this same store. */}
-        <div className="flex items-start justify-between gap-3 rounded-2xl border border-line bg-surface p-4 text-sm">
-          <p className="min-w-0">
-            <span className="text-muted">You teach </span>
-            <span className="font-semibold">{summary.teach}</span>
-            <span className="text-muted"> to </span>
-            <span className="font-semibold">{summary.to}</span>
-          </p>
-          <Link href={`/?edit=${encodeURIComponent(token)}`} className="shrink-0 font-bold text-saffron underline underline-offset-4">
-            Edit my answers
-          </Link>
         </div>
         <div className="space-y-2" role="radiogroup" aria-label="Directions">
           {directions.map((d) => {
@@ -392,8 +430,8 @@ function PickDirection({
               <span className="h-px flex-1 bg-line" />
             </div>
             <div className="space-y-2">
-              <label htmlFor="f-direction" className="block text-sm font-bold">
-                Describe it yourself
+              <label htmlFor="f-direction" className="block text-sm font-semibold">
+                or describe it yourself
               </label>
               <textarea
                 id="f-direction"
@@ -414,6 +452,9 @@ function PickDirection({
         <button type="button" disabled={!value} className={btnClass("primary", "lg", "w-full")} onClick={() => value && onPick(value)}>
           Use this
         </button>
+        <Link href={`/?edit=${encodeURIComponent(token)}`} className="mx-auto block w-fit py-3 text-sm font-bold text-saffron underline underline-offset-4">
+          Edit my answers
+        </Link>
       </div>
     </Screen>
   );

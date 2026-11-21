@@ -16,7 +16,19 @@
   --color-warn-bg: #fff3c4;
   --color-warn-ink: #6b4a00;
   --color-scrim: #4a4038;
-  --color-danger: #b00020;
+  --color-danger: #b42318;
+  /* v5 tokens (Design/TOKENS.md "v5 additions") */
+  --color-danger-line: #f1c4bf;
+  --color-on-ink-link: #fdba74;
+  --color-private-bg: #fff8e6;
+  --color-private-line: #f3e2ae;
+  --color-private-ink: #6b4a00;
+  --color-private-head: #4a3300;
+  --color-calm-bg: #fffaeb;
+  --color-calm-field: #e0c27a;
+  --color-switch-off: #d9ccbc;
+  --shadow-toast: 0 10px 24px rgba(34, 26, 20, 0.25);
+  --shadow-menu: 0 16px 40px rgba(34, 26, 20, 0.18);
 
   --color-saffron: #b4500a;
   --color-saffron-soft: #fcebdd;
@@ -49,6 +61,6 @@ body {
 
 /* V3 generating screen: indeterminate progress */
 @keyframes indeterminate {
-  0% { left: -35%; }
+  0% { left: -40%; }
   100% { left: 100%; }
 }

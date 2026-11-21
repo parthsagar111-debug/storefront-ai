@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { StoreView } from "@/components/store-view";
 import { Button, StatusBadge, Logo, btnClass } from "@/components/ui";
-import { IconPencil, IconRefresh, IconArrowUpRight, IconChevronDown, IconChevronUp, IconHand, IconChat } from "@/components/icons";
+import { IconPencil, IconRefresh, IconArrowUpRight, IconChevronDown, IconChevronUp, IconEye, IconTrash, IconMore, IconX } from "@/components/icons";
 import type { TStoreContent, TProduct } from "@/lib/ai/schemas";
 import { FORMAT_LABEL, rangeFor, formatINR, ENTRY_MAX } from "@/lib/pricing";
 import { HeaderSheet, ProductSheet, PublishSheet, type PatchFn } from "./sheets";
@@ -66,6 +66,24 @@ export default function StoreEditor({
   const [regenAsk, setRegenAsk] = useState<{ target: "bio" } | { target: "product"; productId: string; title: string } | null>(null);
   const [hint, setHint] = useState("");
   const [buyerView, setBuyerView] = useState(false);
+  // V3 one-time tip, shown as a tooltip under the header's Edit (Claude Design v5); dismissal remembered.
+  const [tip, setTip] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      try {
+        setTip(localStorage.getItem("sf.tip.edit.v1") !== "1");
+      } catch {
+        setTip(true);
+      }
+    }, 0);
+    return () => clearTimeout(t);
+  }, []);
+  const dismissTip = () => {
+    setTip(false);
+    try {
+      localStorage.setItem("sf.tip.edit.v1", "1");
+    } catch {}
+  };
   const [why, setWhy] = useState<string | null>(null);
   const [noteSeen, setNoteSeen] = useState(true);
   // IQA-01: the draft revision this tab last saw; every write sends it and the server returns the next one.
@@ -262,18 +280,11 @@ export default function StoreEditor({
     if (!publishedAt) return null;
     const c = counts?.products[p.id];
     return (
-      <div className="border-t border-line px-4 py-3 text-sm">
-        <p className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          <span className="inline-flex items-center gap-1.5">
-            <IconHand size={16} className="text-saffron" />
-            <b>{c?.interested ?? 0}</b> interested taps
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <IconChat size={16} className="text-teal" />
-            <b>{c?.whatsapp ?? 0}</b> WhatsApp taps
-          </span>
+      <div className="border-t border-line bg-paper/60 px-4 py-3 text-sm">
+        <p>
+          <b>{c?.interested ?? 0}</b> interested taps · <b>{c?.whatsapp ?? 0}</b> WhatsApp taps
         </p>
-        {!noteSeen && <p className="mt-1 text-xs text-muted">Taps show interest, not purchases.</p>}
+        {!noteSeen && <p className="mt-0.5 text-xs text-muted">Taps show interest, not purchases.</p>}
       </div>
     );
   };
@@ -282,7 +293,7 @@ export default function StoreEditor({
   // V5: republish is one tap "Update live store".
   const publishLabel = publishedAt ? (dirty ? "Update live store" : "Published") : "Publish";
   const editAnswersHref = `/?edit=${encodeURIComponent(token)}`;
-  const menuItem = "flex min-h-11 w-full items-center px-4 text-left text-sm font-bold text-ink active:bg-sand disabled:opacity-40";
+  const menuItem = "flex min-h-12 w-full items-center gap-3 px-4 text-left text-[15px] font-semibold text-ink active:bg-sand disabled:opacity-40";
 
   if (deleted) {
     return (
@@ -298,54 +309,39 @@ export default function StoreEditor({
 
   return (
     <div className="min-h-dvh">
-      {/* Top bar. Phone (< 768): name + badge + Publish + ⋯ (V4). ≥ md: logo, name, badge, actions (unchanged). */}
+      {/* Top bar (Claude Design v5). Phone: name over badge, ⋯, Publish. ≥ md: logo, name + badge, View live, ⋯, Regenerate all, Publish. */}
       <div className="sticky top-0 z-30 border-b border-line bg-surface/95 backdrop-blur">
         <div className="mx-auto flex max-w-[480px] items-center gap-2 px-4 py-3 md:max-w-none md:gap-3 md:px-6">
           <span className="hidden md:block">
             <Logo withName={false} />
           </span>
-          <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3">
-            <p className="min-w-0 truncate font-bold md:text-lg">{draft.creator.displayName}</p>
+          <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5 md:flex-row md:items-center md:gap-3">
+            <p className="w-full min-w-0 truncate font-bold md:w-auto md:text-lg">{draft.creator.displayName}</p>
             <StatusBadge kind={badge} />
           </div>
-          {/* Desktop only (wrappers, since the button classes set their own display). */}
           {publishedAt && (
             <span className="hidden md:contents">
-              <a
-                href={`/s/${slug}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="View live"
-                className={btnClass("secondary", "sm", "border-0 bg-transparent")}
-              >
+              <a href={`/s/${slug}`} target="_blank" rel="noopener noreferrer" aria-label="View live" className={btnClass("ghost", "sm", "")}>
                 View live <IconArrowUpRight size={16} />
               </a>
             </span>
           )}
-          {/* T28 / V4: new answers for the same store/token → confirm → regenerate (S1 in edit mode). */}
-          <span className="hidden md:contents">
-            <Link href={editAnswersHref} className={btnClass("secondary", "sm", "shrink-0 whitespace-nowrap")}>
-              Start over / Edit answers
-            </Link>
-          </span>
-          <Button size="sm" className="shrink-0 md:hidden" disabled={anyBusy} onClick={() => setSheet({ kind: "publish" })}>
-            {publishLabel}
-          </Button>
-          {/* T29 / V4 overflow menu */}
+          {/* T29 / V4 overflow menu (Start over / Edit answers lives here on every size, per the v5 frames). */}
           <div className="relative">
             <button
               type="button"
               aria-label="More actions"
               aria-haspopup="menu"
               aria-expanded={menuOpen}
-              className={btnClass("secondary", "sm", "min-w-11 px-0 text-lg leading-none")}
+              className={`flex h-11 w-11 items-center justify-center rounded-[14px] border text-ink ${menuOpen ? "border-ink bg-sand" : "border-line-input bg-surface"}`}
               onClick={() => setMenuOpen(!menuOpen)}
             >
-              ⋯
+              <IconMore size={20} />
             </button>
             {menuOpen && (
-              <div role="menu" className="absolute right-0 top-full z-40 mt-2 w-60 overflow-hidden rounded-2xl border border-line bg-surface py-1 shadow-card">
-                <Link role="menuitem" href={editAnswersHref} className={`${menuItem} md:hidden`} onClick={() => setMenuOpen(false)}>
+              <div role="menu" className="absolute right-0 top-full z-40 mt-2 w-64 overflow-hidden rounded-2xl border border-line bg-surface py-1.5 shadow-[var(--shadow-menu)]">
+                <Link role="menuitem" href={editAnswersHref} className={menuItem} onClick={() => setMenuOpen(false)}>
+                  <IconRefresh size={18} className="-scale-x-100" />
                   Start over / Edit answers
                 </Link>
                 <button
@@ -358,6 +354,7 @@ export default function StoreEditor({
                     setConfirmAll(true);
                   }}
                 >
+                  <IconRefresh size={18} />
                   {busy.all ? "Regenerating…" : "Regenerate all"}
                 </button>
                 <button
@@ -369,13 +366,16 @@ export default function StoreEditor({
                     setBuyerView(true);
                   }}
                 >
+                  <IconEye size={18} />
                   View as buyer
                 </button>
                 {publishedAt && (
                   <a role="menuitem" href={`/s/${slug}`} target="_blank" rel="noopener noreferrer" className={`${menuItem} md:hidden`} onClick={() => setMenuOpen(false)}>
+                    <IconArrowUpRight size={18} />
                     View live store
                   </a>
                 )}
+                <div className="mx-4 my-1.5 h-px bg-line" />
                 <button
                   type="button"
                   role="menuitem"
@@ -385,11 +385,15 @@ export default function StoreEditor({
                     setConfirmDelete(true);
                   }}
                 >
+                  <IconTrash size={18} />
                   Delete store
                 </button>
               </div>
             )}
           </div>
+          <Button size="sm" className="shrink-0 px-4 md:hidden" disabled={anyBusy} onClick={() => setSheet({ kind: "publish" })}>
+            {publishLabel}
+          </Button>
           <div className="hidden gap-2 md:flex">
             <Button variant="secondary" size="sm" disabled={anyBusy} onClick={() => setConfirmAll(true)}>
               <IconRefresh size={16} />
@@ -417,16 +421,31 @@ export default function StoreEditor({
             content={draft}
             busy={busy}
             highlightId={editingId}
-            headerToolbar={editRegen(
-              () => setSheet({ kind: "header" }),
-              () => {
-                setHint("");
-                setRegenAsk({ target: "bio" });
-              },
-              sheet?.kind === "header",
-              "header",
-              "Regenerate bio",
-            )}
+            headerToolbar={
+              <div className="relative ml-auto">
+                {editRegen(
+                  () => {
+                    dismissTip();
+                    setSheet({ kind: "header" });
+                  },
+                  () => {
+                    setHint("");
+                    setRegenAsk({ target: "bio" });
+                  },
+                  sheet?.kind === "header",
+                  "header",
+                  "Regenerate bio",
+                )}
+                {tip && (
+                  <div role="status" className="absolute right-0 top-full z-20 mt-2 flex w-[260px] items-start gap-2 rounded-[14px] bg-ink py-3 pl-4 pr-2 text-sm font-semibold text-white shadow-[var(--shadow-toast)]">
+                    <span className="flex-1 pt-0.5">Tap Edit on anything to change it</span>
+                    <button type="button" aria-label="Dismiss tip" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" onClick={dismissTip}>
+                      <IconX size={16} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            }
             beforeProducts={
               <p className="px-2 text-sm text-muted">
                 Prices are starting suggestions based on format and your audience. Tap Why ₹X? or edit any price.
@@ -484,9 +503,9 @@ export default function StoreEditor({
       )}
 
       {regenAsk && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-scrim/70 p-4 md:items-center" role="dialog" aria-modal aria-labelledby="regen-title">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-scrim/80 md:items-center md:p-4" role="dialog" aria-modal aria-labelledby="regen-title">
           <form
-            className="w-full max-w-sm space-y-4 rounded-[24px] bg-surface p-5"
+            className="w-full max-w-[480px] space-y-4 rounded-t-[24px] bg-surface px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2 md:max-w-sm md:rounded-[24px] md:pt-5"
             onSubmit={(e) => {
               e.preventDefault();
               const h = hint.trim() || undefined;
@@ -495,30 +514,37 @@ export default function StoreEditor({
               regenerate(ask.target === "bio" ? { target: "bio", hint: h } : { target: "product", productId: ask.productId, hint: h });
             }}
           >
-            <p id="regen-title" className="font-display text-xl font-bold [overflow-wrap:anywhere]">
-              {regenAsk.target === "bio" ? "New headline and bio" : `New version of “${regenAsk.title}”`}
-            </p>
+            <div className="mx-auto h-1 w-10 rounded-full bg-line-input md:hidden" aria-hidden />
+            <div>
+              <p id="regen-title" className="font-display text-[22px] font-bold">
+                {regenAsk.target === "bio" ? "Regenerate your bio" : "Regenerate this product"}
+              </p>
+              <p className="text-sm text-muted [overflow-wrap:anywhere]">{regenAsk.target === "bio" ? "Headline and bio" : regenAsk.title}</p>
+            </div>
             <div className="space-y-2">
-              <label htmlFor="regen-hint" className="block text-sm font-bold">
-                What should change? <span className="font-medium text-muted">(optional)</span>
-              </label>
+              <div className="flex items-baseline justify-between gap-2">
+                <label htmlFor="regen-hint" className="text-sm font-semibold">
+                  What should change? <span className="font-normal text-muted">(optional)</span>
+                </label>
+                <span className="text-xs text-muted">
+                  {hint.length}/{HINT_MAX}
+                </span>
+              </div>
               <input
                 id="regen-hint"
-                className={inputCls()}
+                className={`${inputCls()} min-h-12 border-[1.5px]`}
                 value={hint}
                 maxLength={HINT_MAX}
                 placeholder={regenAsk.target === "bio" ? "e.g. shorter, more friendly" : "e.g. cheaper, for beginners, a live format"}
                 onChange={(e) => setHint(e.target.value)}
               />
-              <p className="text-right text-xs text-muted">
-                {hint.length}/{HINT_MAX}
-              </p>
             </div>
             <div className="flex gap-2">
               <Button variant="secondary" className="flex-1" onClick={() => setRegenAsk(null)}>
                 Cancel
               </Button>
               <button type="submit" className={btnClass("primary", "md", "flex-1")}>
+                <IconRefresh size={18} />
                 Regenerate
               </button>
             </div>
@@ -528,9 +554,9 @@ export default function StoreEditor({
 
       {buyerView && (
         <div className="fixed inset-0 z-[60] overflow-y-auto bg-paper" role="dialog" aria-modal aria-label="Buyer view of your draft">
-          <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-line bg-ink px-4 py-2 text-sm text-paper">
+          <div className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-ink px-4 py-1.5 text-sm text-white">
             <span className="font-semibold">Buyer view of your draft</span>
-            <button type="button" className="min-h-11 font-bold underline underline-offset-4" onClick={() => setBuyerView(false)}>
+            <button type="button" className="min-h-11 font-bold text-on-ink-link" onClick={() => setBuyerView(false)}>
               Back to editing
             </button>
           </div>
@@ -539,16 +565,16 @@ export default function StoreEditor({
       )}
 
       {undo && !toast && (
-        <div className="fixed inset-x-4 bottom-20 z-50 mx-auto flex max-w-[440px] items-center justify-between gap-3 rounded-2xl bg-ink px-4 py-2 text-sm font-semibold text-white shadow-card" role="status">
+        <div className="fixed inset-x-4 bottom-6 z-50 mx-auto flex max-w-[440px] items-center justify-between gap-3 rounded-[14px] bg-ink py-1.5 pl-4 pr-2 text-[15px] font-semibold text-white shadow-[var(--shadow-toast)]" role="status">
           <span>Regenerated.</span>
-          <button type="button" className="min-h-11 px-2 font-bold underline underline-offset-4" onClick={undoRegenerate}>
+          <button type="button" className="min-h-11 px-3 font-bold text-on-ink-link" onClick={undoRegenerate}>
             Undo
           </button>
         </div>
       )}
 
       {toast && (
-        <div className="fixed inset-x-4 bottom-20 z-50 mx-auto max-w-[440px] rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white shadow-card md:bottom-8" role="status">
+        <div className="fixed inset-x-4 bottom-6 z-50 mx-auto max-w-[440px] rounded-[14px] bg-ink px-4 py-3 text-[15px] font-semibold text-white shadow-[var(--shadow-toast)] md:bottom-8" role="status">
           {toast}
         </div>
       )}

@@ -26,7 +26,7 @@ export const THEMES: Record<TStoreContent["theme"], { accent: string; soft: stri
 };
 
 /** Format covers: 135° gradient + icon (TOKENS.md). */
-const COVER: Record<TProduct["format"], { from: string; to: string; Icon: ComponentType<{ size?: number; className?: string }> }> = {
+export const COVER: Record<TProduct["format"], { from: string; to: string; Icon: ComponentType<{ size?: number; className?: string }> }> = {
   ebook: { from: "#B45309", to: "#78350F", Icon: IconBook },
   template_pack: { from: "#BE185D", to: "#831843", Icon: IconTemplate },
   recorded_course: { from: "#4338CA", to: "#312E81", Icon: IconPlayCircle },
@@ -132,7 +132,14 @@ export function StoreView(props: StoreViewProps) {
           (group, gi) =>
             group.length > 0 && (
               <section key={gi} className="space-y-4 px-4" aria-label={gi === 0 ? "Available now" : "Coming soon"}>
-                {gi === 1 && <h2 className="pt-2 font-display text-lg font-bold">Coming soon</h2>}
+                {gi === 0 ? (
+                  <h2 className="flex items-center gap-2 pt-1 font-display text-xl font-bold">
+                    <span className="h-2 w-2 rounded-full bg-teal" aria-hidden />
+                    Available now
+                  </h2>
+                ) : (
+                  <h2 className="pt-3 font-display text-xl font-bold">Coming soon</h2>
+                )}
                 {group.map((p) => (
                   <div key={p.id}>
                     <ProductCard
@@ -224,8 +231,8 @@ function ProductCard({
             <h2 className="min-w-0 flex-1 font-display text-lg font-bold leading-snug [overflow-wrap:anywhere]">{p.title}</h2>
             <span className="shrink-0 font-display text-[21px] font-bold leading-tight [overflow-wrap:anywhere]">{formatINR(p.price)}</span>
           </div>
+          {indicative && <p className="-mt-2 text-xs leading-snug text-muted">Indicative price. Final price may change when available.</p>}
           <p className="text-sm leading-relaxed text-muted [overflow-wrap:anywhere]">{p.summary}</p>
-          {indicative && <p className="text-xs text-muted">Indicative price. Final price may change when available.</p>}
           {cta}
         </div>
         <button

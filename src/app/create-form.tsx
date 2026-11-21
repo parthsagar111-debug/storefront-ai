@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Chip, ChoiceChip, Segmented, Logo, btnClass, inputCls } from "@/components/ui";
 import type { ReactNode } from "react";
-import { IconArrowUpRight, IconPlus, IconX, IconAlert } from "@/components/icons";
+import { IconArrowUpRight, IconAlert, IconChevronDown, IconChevronUp } from "@/components/icons";
 import { parseInstagram, INSTAGRAM_HINT } from "@/lib/instagram";
 import {
   listStores,
@@ -270,7 +270,6 @@ function CreateFormInner() {
     );
   }
 
-  const label = "block text-sm font-bold";
   // QA-07: on blur, a touched field that the client check would block shows its message under the field.
   const blurCheck = (f: Field) => {
     if (f === "outcome") return; // optional
@@ -354,19 +353,22 @@ function CreateFormInner() {
           </p>
         )}
 
-        <TextField k="name" label="I'm" placeholder="Your name" autoComplete="name" {...fieldProps("name")} />
+        {/* V1 + Claude Design v5: the three sentence parts in one white card, heading-font labels. */}
+        <div className="flex flex-col gap-5 rounded-[22px] border border-line bg-surface px-4 py-5">
+          <TextField k="name" big label="I'm" placeholder="Your name" autoComplete="name" {...fieldProps("name")} />
 
-        <TextField k="expertise" label="I teach" placeholder="e.g. Home cooking" {...fieldProps("expertise")}>
-          <ChipRow chips={NICHES.map(([, c]) => c)} value={v.expertise} onPick={(c) => pick("expertise", c)} />
-        </TextField>
+          <TextField k="expertise" big label="I teach" placeholder="or type what you teach" {...fieldProps("expertise")}>
+            <ChipRow chips={NICHES.map(([, c]) => c)} value={v.expertise} onPick={(c) => pick("expertise", c)} />
+          </TextField>
 
-        <TextField k="audience" label="to" placeholder="e.g. Working professionals" {...fieldProps("audience")}>
-          {/* Chips follow the niche; tapping one fills the field, typed text is never overwritten by a niche change. */}
-          <ChipRow chips={AUDIENCE_CHIPS[niche ?? "general"]} value={v.audience} onPick={(c) => pick("audience", c)} />
-        </TextField>
+          <TextField k="audience" big label="to" placeholder="or type who it's for" {...fieldProps("audience")}>
+            {/* Chips follow the niche; tapping one fills the field, typed text is never overwritten by a niche change. */}
+            <ChipRow chips={AUDIENCE_CHIPS[niche ?? "general"]} value={v.audience} onPick={(c) => pick("audience", c)} />
+          </TextField>
+        </div>
 
         <fieldset className="space-y-2">
-          <legend className={`${label} pb-2`}>How many people follow you?</legend>
+          <legend className="pb-2 text-[15px] font-semibold">How many people follow you?</legend>
           <div className="flex flex-wrap gap-2">
             {SIZES.map(([k, text]) => (
               <ChoiceChip
@@ -385,7 +387,7 @@ function CreateFormInner() {
         </fieldset>
 
         <div className="space-y-2">
-          <span className={label}>Store language</span>
+          <span className="block text-[15px] font-semibold">Language</span>
           <Segmented
             label="Store language"
             value={lang}
@@ -397,32 +399,30 @@ function CreateFormInner() {
           />
         </div>
 
-        <div className="border-t border-line pt-2">
+        <div className={`border-y border-line ${moreOpen ? "pb-5" : ""}`}>
           <button
             type="button"
             aria-expanded={moreOpen}
             aria-controls="more-options"
-            className="flex min-h-12 w-full items-center justify-between text-left font-bold"
+            className="flex min-h-[52px] w-full items-center justify-between px-0.5 text-left text-[15px] font-semibold"
             onClick={() => setMoreOpen((o) => !o)}
           >
-            <span>
-              More options <span className="font-medium text-muted">(optional)</span>
-            </span>
-            {moreOpen ? <IconX size={18} /> : <IconPlus size={20} />}
+            <span>More options</span>
+            {moreOpen ? <IconChevronUp size={20} /> : <IconChevronDown size={20} />}
           </button>
           {moreOpen && (
-            <div id="more-options" className="space-y-6 pt-3">
-              <TextField k="outcome" label="What result do they get?" optional placeholder="e.g. Cook in 20 minutes" {...fieldProps("outcome")}>
+            <div id="more-options" className="space-y-[18px] pt-1">
+              <TextField k="outcome" label="What result do they get?" optional placeholder="or type the result" {...fieldProps("outcome")}>
                 {niche && <ChipRow chips={RESULT_CHIPS[niche]} value={v.outcome} onPick={(c) => pick("outcome", c)} />}
               </TextField>
               <div className="space-y-2">
-                <label htmlFor="f-insta" className={label}>
-                  Instagram handle <span className="font-medium text-muted">(optional)</span>
+                <label htmlFor="f-insta" className="block text-sm font-semibold">
+                  Instagram handle <span className="font-normal text-muted">(optional)</span>
                 </label>
                 <div
                   className={`flex overflow-hidden rounded-xl border bg-surface focus-within:border-saffron ${fieldErr.instagramHandle ? "border-danger" : "border-line-input"}`}
                 >
-                  <span className="flex items-center bg-sand px-3 text-muted">@</span>
+                  <span className="flex items-center border-r border-line-input bg-[#F7F1E8] px-3 font-bold text-ink/80">@</span>
                   <input
                     id="f-insta"
                     className="min-h-12 w-full px-3 text-base outline-none"
@@ -443,7 +443,7 @@ function CreateFormInner() {
                   />
                 </div>
                 <FieldError id="e-instagramHandle" msg={fieldErr.instagramHandle} />
-                <p id="h-insta" className="text-xs text-muted">Shown as a link on your store. We don&apos;t read your profile.</p>
+                <p id="h-insta" className="text-[13px] leading-snug text-muted">Shown as a link on your store. We don&apos;t read your profile.</p>
               </div>
             </div>
           )}
@@ -464,16 +464,16 @@ function CreateFormInner() {
         </button>
       </div>
       {confirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-scrim/70 p-4 md:items-center" role="dialog" aria-modal aria-label="Regenerate with new answers">
-          <div className="w-full max-w-sm space-y-4 rounded-[24px] bg-surface p-5">
-            <p className="font-display text-xl font-bold">Regenerate your store?</p>
-            <p className="text-sm text-muted">This replaces your bio and all products, including your edits. Your live page stays as it is until you publish again.</p>
-            <div className="flex gap-2">
-              <button type="button" className={btnClass("secondary", "md", "flex-1")} onClick={() => setConfirmOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/80 p-5" role="dialog" aria-modal aria-label="Start over">
+          <div className="w-full max-w-sm space-y-4 rounded-[24px] bg-surface p-5 shadow-[var(--shadow-menu)]">
+            <p className="font-display text-2xl font-bold">Start over?</p>
+            <p className="leading-relaxed text-ink/80">This replaces your bio and all products, including your edits. Your live page stays as it is until you publish again.</p>
+            <div className="flex gap-2 pt-1">
+              <button type="button" className={btnClass("secondary", "lg", "flex-1 text-base")} onClick={() => setConfirmOpen(false)}>
                 Cancel
               </button>
-              <button type="button" className={btnClass("primary", "md", "flex-1")} onClick={regenerateWithNewAnswers}>
-                Regenerate
+              <button type="button" className={btnClass("primary", "lg", "flex-1 text-base")} onClick={regenerateWithNewAnswers}>
+                Start over
               </button>
             </div>
           </div>
@@ -490,6 +490,8 @@ function TextField(props: {
   placeholder?: string;
   autoComplete?: string;
   optional?: boolean;
+  /** S1 sentence part: 26 px heading-font label, chips above the input, paper-coloured input. */
+  big?: boolean;
   value: string;
   error?: string;
   onChange: (v: string) => void;
@@ -498,14 +500,15 @@ function TextField(props: {
 }) {
   const { k, error } = props;
   return (
-    <div className="space-y-2">
-      <label htmlFor={`f-${k}`} className="block text-sm font-bold">
+    <div className={props.big ? "flex flex-col gap-2.5" : "space-y-2"}>
+      <label htmlFor={`f-${k}`} className={props.big ? "block font-display text-[26px] font-bold leading-none" : "block text-sm font-semibold"}>
         {props.label}
-        {props.optional && <span className="font-medium text-muted"> (optional)</span>}
+        {props.optional && <span className="font-normal text-muted"> (optional)</span>}
       </label>
+      {props.children}
       <input
         id={`f-${k}`}
-        className={inputCls(Boolean(error))}
+        className={`${inputCls(Boolean(error))} ${props.big ? "min-h-[52px] rounded-[14px] border-[1.5px] text-[17px] [&:not([aria-invalid=true])]:bg-paper" : "min-h-12 border-[1.5px]"}`}
         value={props.value}
         placeholder={props.placeholder}
         maxLength={500}
@@ -517,7 +520,6 @@ function TextField(props: {
         onBlur={props.onBlur}
       />
       <FieldError id={`e-${k}`} msg={error} />
-      {props.children}
     </div>
   );
 }

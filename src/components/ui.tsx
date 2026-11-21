@@ -28,7 +28,7 @@ export function Chip({ selected, children, ...rest }: ButtonHTMLAttributes<HTMLB
       type="button"
       aria-pressed={selected}
       {...rest}
-      className={`min-h-11 rounded-full border px-4 text-sm font-medium transition ${
+      className={`min-h-11 rounded-full border-[1.5px] px-3.5 text-sm font-medium transition ${
         selected ? "border-saffron bg-saffron-soft font-semibold text-saffron-ink" : "border-line-input bg-surface text-ink active:bg-sand"
       }`}
     >
@@ -44,7 +44,7 @@ export function ChoiceChip({ selected, children, ...rest }: ButtonHTMLAttributes
       type="button"
       aria-pressed={selected}
       {...rest}
-      className={`min-h-11 rounded-full border px-4 text-sm font-semibold transition ${
+      className={`min-h-11 rounded-full border-[1.5px] px-3.5 text-sm font-semibold transition ${
         selected ? "border-ink bg-ink text-white" : "border-line-input bg-surface text-ink active:bg-sand"
       }`}
     >

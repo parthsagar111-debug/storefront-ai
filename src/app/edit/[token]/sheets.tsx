@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Sheet, Field } from "@/components/sheet";
 import { Button, Segmented, SectionLabel, btnClass, inputCls } from "@/components/ui";
-import { IconAlert, IconChat, IconCheck, IconCopy, IconEye, IconLock } from "@/components/icons";
+import { IconAlert, IconChat, IconCheck, IconCopy, IconEye, IconLock, IconShare, IconTrash } from "@/components/icons";
+import { COVER } from "@/components/store-view";
 import type { TStoreContent, TProduct } from "@/lib/ai/schemas";
 import { FORMATS } from "@/lib/ai/schemas";
 import { FORMAT_LABEL, PRICE_TABLE, rangeFor, formatINR, ENTRY_MAX } from "@/lib/pricing";
@@ -265,7 +266,7 @@ export function ProductSheet({
       <Field
         label="Format"
         htmlFor="p-format"
-        hint={product.priceSource === "ai_tier" ? "Changing format moves the price to the new format's typical price." : "Your price stays when you change format. Check the suggested range below."}
+        hint="Changing format updates the suggested price, unless you've set your own."
       >
         <select
           id="p-format"
@@ -288,12 +289,12 @@ export function ProductSheet({
 
       <SectionLabel>Price</SectionLabel>
       <Field label="Price" htmlFor="p-price" aside={`Suggested ${formatINR(range.min)}–${formatINR(range.max)}`} error={bad === "price" ? FIELD_MSG.price : null}>
-        <div className={`flex overflow-hidden rounded-xl border bg-surface focus-within:border-saffron ${bad === "price" ? "border-danger" : outside ? "border-warn-ink/40" : "border-line-input"}`}>
+        <div className={`flex overflow-hidden rounded-xl border-[1.5px] bg-surface focus-within:border-saffron ${bad === "price" ? "border-danger" : outside ? "border-calm-field" : "border-line-input"}`}>
           <span className="flex items-center border-r border-line bg-sand/60 px-4 font-bold text-ink/80">₹</span>
           <input id="p-price" className="min-h-12 w-full px-3 text-base outline-none" inputMode="numeric" value={v.price} onChange={set("price")} />
         </div>
         {outside && (
-          <p className="flex gap-2 rounded-xl border border-warn-ink/15 bg-warn-bg px-3 py-2 text-sm text-warn-ink">
+          <p className="flex gap-2 rounded-xl border border-private-line bg-calm-bg px-3 py-2 text-sm text-private-ink">
             <IconAlert size={18} className="shrink-0" />
             {price > range.max ? `Higher than most ${formatName}s.` : `Lower than most ${formatName}s.`} You can keep it if your audience pays this.
           </p>
@@ -338,11 +339,16 @@ export function ProductSheet({
               You can&apos;t remove this product: it&apos;s your only one under ₹500, and new buyers usually start with something cheap.
             </p>
           ) : removeStep === "idle" ? (
-            <button type="button" className="min-h-11 text-sm font-bold text-danger underline underline-offset-4" onClick={() => setRemoveStep("confirm")}>
+            <button
+              type="button"
+              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border-[1.5px] border-danger-line bg-surface font-bold text-danger active:bg-red-50"
+              onClick={() => setRemoveStep("confirm")}
+            >
+              <IconTrash size={18} />
               Remove product
             </button>
           ) : (
-            <div className="space-y-3 rounded-2xl border border-danger/20 bg-red-50 p-3">
+            <div className="space-y-3 rounded-2xl border border-danger-line bg-red-50 p-3">
               <p className="text-sm font-semibold text-ink">Remove “{product.title}” from your store?</p>
               <div className="flex gap-2">
                 <Button variant="secondary" size="sm" className="flex-1" disabled={removeStep === "busy"} onClick={() => setRemoveStep("idle")}>
@@ -373,25 +379,29 @@ export function ProductSheet({
   );
 }
 
-/** V5 switch row for the readiness toggles. */
-function ReadyToggle({ on, onChange, title, price }: { on: boolean; onChange: (v: boolean) => void; title: string; price: number }) {
+/** V5 switch row for the readiness toggles (v5 tokens: switch 52×32, on teal, off #D9CCBC). */
+function ReadyToggle({ on, onChange, product }: { on: boolean; onChange: (v: boolean) => void; product: TProduct }) {
+  const cover = COVER[product.format];
   return (
     <button
       type="button"
       role="switch"
       aria-checked={on}
-      aria-label={`${title}: ${on ? "Available now" : "Coming soon"}`}
-      className="flex min-h-14 w-full items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-2 text-left"
+      aria-label={`${product.title}: ${on ? "Available now" : "Coming soon"}`}
+      className="flex min-h-[60px] w-full items-center gap-3 py-2 text-left"
       onClick={() => onChange(!on)}
     >
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] text-white" style={{ background: `linear-gradient(135deg, ${cover.from}, ${cover.to})` }} aria-hidden>
+        <cover.Icon size={20} />
+      </span>
       <span className="min-w-0 flex-1">
-        <span className="block font-semibold leading-snug [overflow-wrap:anywhere]">{title}</span>
+        <span className="block truncate font-bold leading-snug">{product.title}</span>
         <span className="text-sm text-muted">
-          {formatINR(price)} · {on ? "Available now" : "Coming soon"}
+          {formatINR(product.price)} · {on ? <b className="text-teal">Available now</b> : "Coming soon"}
         </span>
       </span>
-      <span className={`relative h-7 w-12 shrink-0 rounded-full transition ${on ? "bg-teal" : "bg-line-input"}`} aria-hidden>
-        <span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${on ? "left-6" : "left-1"}`} />
+      <span className={`relative h-8 w-[52px] shrink-0 rounded-full transition ${on ? "bg-teal" : "bg-switch-off"}`} aria-hidden>
+        <span className={`absolute top-0.5 h-7 w-7 rounded-full bg-white shadow transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
       </span>
     </button>
   );
@@ -523,50 +533,49 @@ export function PublishSheet({
     } catch {}
   };
   const editUrl = typeof window !== "undefined" ? `${location.origin}/edit/${token}` : "";
-  const title = step === "form" ? "Publish your store" : step === "live" ? "Your store is live 🎉" : step === "retry" ? "Not published yet" : "Publishing…";
+  const title = step === "form" ? "Any of these ready to sell today?" : step === "live" ? "Your store is live" : step === "retry" ? "Not published yet" : "Publishing…";
 
   if (step === "form") {
+    const firstReady = draft.products.find((p) => ready[p.id]);
     return (
       <Sheet
         open
         onClose={onClose}
         title={title}
+        hideHeader
         footer={
           <Button size="lg" className="w-full" onClick={submit}>
             Publish
           </Button>
         }
       >
-        <div className="space-y-3">
-          <h3 className="font-display text-lg font-bold">Any of these ready to sell today?</h3>
-          <p className="text-sm text-muted">Buyers will contact you on WhatsApp. Payments aren&apos;t collected on this store.</p>
-          <div className="space-y-2">
-            {draft.products.map((p) => (
-              <ReadyToggle
-                key={p.id}
-                title={p.title}
-                price={p.price}
-                on={ready[p.id]}
-                onChange={(on) => {
-                  setReady({ ...ready, [p.id]: on });
-                  setErr(null);
-                }}
-              />
-            ))}
-          </div>
-          <p className="text-xs text-muted">Not ready yet? Leave it as Coming soon. Buyers can still tap I&apos;m interested.</p>
+        <div className="space-y-2 pr-8 pt-2">
+          <h2 className="font-display text-[26px] font-bold leading-tight">Any of these ready to sell today?</h2>
+          <p className="text-muted">Buyers will contact you on WhatsApp. Payments aren&apos;t collected on this store.</p>
         </div>
-        <Field
-          label={anyReady ? "WhatsApp number (needed)" : "WhatsApp number (optional)"}
-          htmlFor="pub-wa"
-          error={err}
-          hint={
-            <div className="space-y-1">
-              {anyReady && <p className="text-xs font-semibold text-ink/80">Needed because a product is Available now: buyers message you to buy.</p>}
-              {(waFocus || wa) && <Privacy />}
-            </div>
-          }
-        >
+        <div className="divide-y divide-line border-y border-line">
+          {draft.products.map((p) => (
+            <ReadyToggle
+              key={p.id}
+              product={p}
+              on={ready[p.id]}
+              onChange={(on) => {
+                setReady({ ...ready, [p.id]: on });
+                setErr(null);
+              }}
+            />
+          ))}
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <label htmlFor="pub-wa" className="font-bold">
+              WhatsApp number {!anyReady && <span className="font-normal text-muted">(optional)</span>}
+            </label>
+            {anyReady && <span className="rounded-full bg-saffron-soft px-2.5 py-0.5 text-xs font-bold text-saffron-ink">Required</span>}
+          </div>
+          {firstReady && (
+            <p className="text-sm text-ink/80">Needed because {firstReady.title} is available now. Buyers will message you here.</p>
+          )}
           <div onFocus={() => setWaFocus(true)} onBlur={() => { setWaFocus(false); const n = normalizeIndianMobile(wa); if (n) setWa(n); }}>
             <PhoneInput
               id="pub-wa"
@@ -578,7 +587,14 @@ export function PublishSheet({
               }}
             />
           </div>
-        </Field>
+          {err && (
+            <p className="flex items-center gap-1.5 text-sm font-semibold text-danger" role="alert">
+              <IconAlert size={16} className="shrink-0" />
+              {err}
+            </p>
+          )}
+          {(waFocus || wa) && <Privacy />}
+        </div>
       </Sheet>
     );
   }
@@ -586,54 +602,53 @@ export function PublishSheet({
   return (
     <Sheet open onClose={onClose} title={title} hideHeader>
       {step === "live" ? (
-        <div className="space-y-5 pt-2">
+        <div className="space-y-5 pt-4">
           <div className="flex flex-col items-center gap-4 text-center">
-            <span className="flex h-20 w-20 items-center justify-center rounded-full bg-teal text-white ring-8 ring-teal-soft">
-              <IconCheck size={36} strokeWidth={2.5} />
+            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-teal text-white ring-8 ring-teal-soft">
+              <IconCheck size={30} strokeWidth={2.5} />
             </span>
-            <h2 className="font-display text-[28px] font-bold leading-tight">Your store is live 🎉</h2>
+            <h2 className="font-display text-[28px] font-bold leading-tight">Your store is live</h2>
           </div>
           <div className="space-y-2">
             <p className="text-xs font-bold uppercase tracking-wider text-muted">Your public link</p>
-            <div className="flex items-center gap-2 rounded-2xl border border-line bg-paper p-2 pl-4">
-              <span className="min-w-0 flex-1 truncate text-sm font-bold">{publicUrl.replace(/^https?:\/\//, "")}</span>
-              <Button variant="secondary" size="sm" onClick={() => copy(publicUrl, "pub")}>
+            <p className="truncate rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-bold">{publicUrl.replace(/^https?:\/\//, "")}</p>
+            <div className="flex gap-2">
+              {canShare && (
+                <Button className="flex-1" onClick={share}>
+                  <IconShare size={18} />
+                  Share
+                </Button>
+              )}
+              <Button variant="secondary" aria-label="Copy public link" className={canShare ? "" : "flex-1"} onClick={() => copy(publicUrl, "pub")}>
                 <IconCopy size={16} />
                 {copied === "pub" ? "Copied" : "Copy"}
               </Button>
             </div>
             <p className="text-sm text-muted">Paste this link into your Instagram bio.</p>
           </div>
-          {canShare && (
-            <Button size="lg" variant="teal" className="w-full" onClick={share}>
-              <IconChat size={20} />
-              Share your store
-            </Button>
-          )}
-          <a href={`/s/${slug}`} target="_blank" rel="noopener noreferrer" className="block min-h-11 text-center text-sm font-bold text-saffron underline underline-offset-4">
+          <a href={`/s/${slug}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm font-bold text-saffron underline underline-offset-4">
             View my live store
           </a>
-          <div className="space-y-3 rounded-2xl bg-warn-bg p-4 text-warn-ink">
-            <p className="flex gap-2 text-sm">
+          <div className="space-y-3 rounded-2xl border border-private-line bg-private-bg p-4">
+            <p className="flex items-center gap-2 font-bold text-private-head">
               <IconLock size={18} className="shrink-0" />
-              <span>
-                <b>Your private edit link.</b> {PRIVATE_WARNING}
-              </span>
+              Your private edit link
             </p>
-            <p className="break-all rounded-lg bg-surface/70 px-3 py-2 font-mono text-xs text-ink">{editUrl}</p>
-            <a
-              className={btnClass("secondary", "md", "w-full border-warn-ink/25")}
-              href={`https://wa.me/?text=${encodeURIComponent(`My Storefront edit link: ${editUrl}\n${PRIVATE_WARNING}`)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <IconChat size={16} />
-              Save my private edit link on WhatsApp
-            </a>
-            <button type="button" className={btnClass("secondary", "md", "w-full border-warn-ink/25")} onClick={() => copy(editUrl, "edit")}>
-              <IconCopy size={16} />
-              {copied === "edit" ? "Copied" : "Copy edit link"}
-            </button>
+            <div className="flex gap-2">
+              <a
+                className={btnClass("teal", "md", "flex-1 text-sm leading-tight")}
+                href={`https://wa.me/?text=${encodeURIComponent(`My Storefront edit link: ${editUrl}\n${PRIVATE_WARNING}`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <IconChat size={16} className="shrink-0" />
+                Save my private edit link on WhatsApp
+              </a>
+              <button type="button" aria-label="Copy edit link" className={btnClass("secondary", "md", "border-private-line bg-surface/70 text-private-head")} onClick={() => copy(editUrl, "edit")}>
+                {copied === "edit" ? "Copied" : "Copy"}
+              </button>
+            </div>
+            <p className="text-sm font-semibold text-private-ink">{PRIVATE_WARNING}</p>
           </div>
         </div>
       ) : step === "retry" ? (
