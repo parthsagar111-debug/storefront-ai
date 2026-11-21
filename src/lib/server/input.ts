@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeInstagram, HANDLE_RE } from "@/lib/instagram";
 import type { CreatorInput } from "@/lib/ai/prompts";
 
 export const AUDIENCE_SIZES = {
@@ -28,11 +29,11 @@ export const StoreInputSchema = z.object({
   outcome: answer,
   audienceSize: z.enum(Object.keys(AUDIENCE_SIZES) as [AudienceSize, ...AudienceSize[]]),
   language: z.enum(["en", "hinglish"]).default("en"),
+  // QA-02: profile URLs, "@handle" and "handle" are all accepted and reduced to the handle.
   instagramHandle: z
     .string()
-    .trim()
-    .transform((s) => s.replace(/^@/, "").slice(0, 30))
-    .refine((s) => s === "" || /^[A-Za-z0-9._]+$/.test(s), "invalid handle")
+    .transform((s) => normalizeInstagram(s))
+    .refine((s) => s === "" || HANDLE_RE.test(s), "invalid handle")
     .optional(),
   direction: z.string().trim().max(500).optional(),
 });

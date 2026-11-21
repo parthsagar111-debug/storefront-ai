@@ -65,8 +65,10 @@ export function newClientRequestId(): string {
 }
 
 /** POST /api/stores with retries on network failure / 5xx, always with the same ids (E9 lost response). */
-export async function submitStore(s: SavedStore): Promise<{ ok: true; slug: string } | { ok: false; status: number; error?: string }> {
-  let last = { ok: false as const, status: 0, error: "network" };
+export async function submitStore(
+  s: SavedStore,
+): Promise<{ ok: true; slug: string } | { ok: false; status: number; error?: string; issues?: string[] }> {
+  let last: { ok: false; status: number; error?: string; issues?: string[] } = { ok: false, status: 0, error: "network" };
   for (let i = 0; i < 3; i++) {
     try {
       const res = await fetch("/api/stores", {
@@ -76,7 +78,7 @@ export async function submitStore(s: SavedStore): Promise<{ ok: true; slug: stri
       });
       const body = await res.json().catch(() => ({}));
       if (res.ok) return { ok: true, slug: body.slug };
-      last = { ok: false, status: res.status, error: body.error };
+      last = { ok: false, status: res.status, error: body.error, issues: Array.isArray(body.issues) ? body.issues : undefined };
       if (res.status < 500) return last; // 4xx: retrying the same body won't help
     } catch {
       last = { ok: false, status: 0, error: "network" };

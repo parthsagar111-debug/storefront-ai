@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Chip, ChoiceChip, Segmented, Logo, btnClass, inputCls } from "@/components/ui";
 import { IconArrowUpRight, IconPlus, IconX, IconAlert } from "@/components/icons";
+import { parseInstagram, INSTAGRAM_HINT } from "@/lib/instagram";
 import {
   listStores,
   saveStore,
@@ -31,6 +32,33 @@ const CHIPS = {
 
 type Field = "name" | "expertise" | "audience" | "outcome";
 
+/** QA-02: field-level messages for client checks and API 400 `issues` paths. */
+const FIELD_MESSAGES: Record<string, string> = {
+  name: "Add your name (at least 2 letters).",
+  expertise: "Add a few words about what you're good at.",
+  audience: "Add a few words about who you help.",
+  outcome: "Add a few words about what they get from you.",
+  audienceSize: "Pick how many people follow you.",
+  instagramHandle: INSTAGRAM_HINT,
+};
+const FIELD_INPUT_ID: Record<string, string> = {
+  name: "f-name",
+  expertise: "f-expertise",
+  audience: "f-audience",
+  outcome: "f-outcome",
+  instagramHandle: "f-insta",
+};
+
+function FieldError({ id, msg }: { id: string; msg?: string }) {
+  if (!msg) return null;
+  return (
+    <p id={id} className="flex items-center gap-1.5 text-sm font-semibold text-danger" role="alert">
+      <IconAlert size={16} className="shrink-0" />
+      {msg}
+    </p>
+  );
+}
+
 /** SPEC S1 client check: blocks only empty, < 2 chars, or one character repeated 5+ times. */
 function tooThin(s: string) {
   const t = s.trim();
@@ -47,6 +75,7 @@ export default function CreateForm() {
   const [showInsta, setShowInsta] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErr, setFieldErr] = useState<Record<string, string>>({});
   const [recent, setRecent] = useState<SavedStore | null>(null);
   const [noStorage, setNoStorage] = useState(false);
   const [onceLink, setOnceLink] = useState<string | null>(null);
@@ -94,8 +123,16 @@ export default function CreateForm() {
 
   async function submit() {
     if (!valid || busy) return;
+    // QA-02: accept profile URLs / "@handle"; only block if it still isn't a handle.
+    const handle = parseInstagram(insta);
+    if (handle === null) {
+      setFieldErr({ instagramHandle: FIELD_MESSAGES.instagramHandle });
+      document.getElementById("f-insta")?.focus();
+      return;
+    }
     setBusy(true);
     setError(null);
+    setFieldErr({});
     // T27: Create always makes a NEW pair, saved before the request (T11).
     const s: SavedStore = {
       token: newToken(),
@@ -103,7 +140,7 @@ export default function CreateForm() {
       name: v.name.trim(),
       createdAt: Date.now(),
       confirmed: false,
-      input: { ...v, audienceSize: size, language: lang, instagramHandle: insta || undefined },
+      input: { ...v, audienceSize: size, language: lang, instagramHandle: handle || undefined },
     };
     const saved = saveStore(s);
     const r = await submitStore(s);
@@ -118,6 +155,13 @@ export default function CreateForm() {
       return;
     }
     setBusy(false);
+    // QA-02: map API field errors to their fields; the generic message only when no field is known.
+    const known = (r.status === 400 ? r.issues ?? [] : []).map((path) => path.split(".")[0]).filter((f) => f in FIELD_MESSAGES);
+    if (known.length) {
+      setFieldErr(Object.fromEntries(known.map((f) => [f, FIELD_MESSAGES[f]])));
+      document.getElementById(FIELD_INPUT_ID[known[0]])?.focus();
+      return;
+    }
     setError(
       r.status === 429
         ? "Too many stores created, try again later."
@@ -128,6 +172,7 @@ export default function CreateForm() {
   }
 
   const label = "block text-sm font-bold";
+  const clearErr = (f: string) => fieldErr[f] && setFieldErr(({ [f]: _gone, ...rest }) => (void _gone, rest));
 
   if (onceLink) {
     return (
@@ -189,13 +234,19 @@ export default function CreateForm() {
           </label>
           <input
             id="f-name"
-            className={inputCls()}
+            className={inputCls(Boolean(fieldErr.name))}
             value={v.name}
             maxLength={500}
             autoComplete="name"
             enterKeyHint="next"
-            onChange={(e) => setV({ ...v, name: e.target.value })}
+            aria-invalid={Boolean(fieldErr.name)}
+            aria-describedby={fieldErr.name ? "e-name" : undefined}
+            onChange={(e) => {
+              setV({ ...v, name: e.target.value });
+              clearErr("name");
+            }}
           />
+          <FieldError id="e-name" msg={fieldErr.name} />
         </div>
 
         {fields.map(([k, text]) => (
@@ -205,15 +256,28 @@ export default function CreateForm() {
             </label>
             <input
               id={`f-${k}`}
-              className={inputCls()}
+              className={inputCls(Boolean(fieldErr[k]))}
               value={v[k]}
               maxLength={500}
               enterKeyHint="next"
-              onChange={(e) => setV({ ...v, [k]: e.target.value })}
+              aria-invalid={Boolean(fieldErr[k])}
+              aria-describedby={fieldErr[k] ? `e-${k}` : undefined}
+              onChange={(e) => {
+                setV({ ...v, [k]: e.target.value });
+                clearErr(k);
+              }}
             />
+            <FieldError id={`e-${k}`} msg={fieldErr[k]} />
             <div className="flex flex-wrap gap-2">
               {CHIPS[k].map((c) => (
-                <Chip key={c} selected={v[k] === c} onClick={() => setV({ ...v, [k]: c })}>
+                <Chip
+                  key={c}
+                  selected={v[k] === c}
+                  onClick={() => {
+                    setV({ ...v, [k]: c });
+                    clearErr(k);
+                  }}
+                >
                   {c}
                 </Chip>
               ))}
@@ -225,11 +289,19 @@ export default function CreateForm() {
           <legend className={`${label} pb-2`}>How many people follow you?</legend>
           <div className="flex flex-wrap gap-2">
             {SIZES.map(([k, text]) => (
-              <ChoiceChip key={k} selected={size === k} onClick={() => setSize(k)}>
+              <ChoiceChip
+                key={k}
+                selected={size === k}
+                onClick={() => {
+                  setSize(k);
+                  clearErr("audienceSize");
+                }}
+              >
                 {text}
               </ChoiceChip>
             ))}
           </div>
+          <FieldError id="e-audienceSize" msg={fieldErr.audienceSize} />
         </fieldset>
 
         <div className="space-y-2">
@@ -264,7 +336,9 @@ export default function CreateForm() {
                   <IconX size={18} />
                 </button>
               </div>
-              <div className="flex overflow-hidden rounded-xl border border-line-input bg-surface focus-within:border-saffron">
+              <div
+                className={`flex overflow-hidden rounded-xl border bg-surface focus-within:border-saffron ${fieldErr.instagramHandle ? "border-danger" : "border-line-input"}`}
+              >
                 <span className="flex items-center bg-sand px-3 text-muted">@</span>
                 <input
                   id="f-insta"
@@ -272,9 +346,20 @@ export default function CreateForm() {
                   value={insta.replace(/^@/, "")}
                   autoCapitalize="none"
                   autoCorrect="off"
-                  onChange={(e) => setInsta(e.target.value)}
+                  aria-invalid={Boolean(fieldErr.instagramHandle)}
+                  aria-describedby={fieldErr.instagramHandle ? "e-instagramHandle" : undefined}
+                  onChange={(e) => {
+                    setInsta(e.target.value);
+                    clearErr("instagramHandle");
+                  }}
+                  onBlur={() => {
+                    // A pasted profile URL becomes the handle the creator will see on the store.
+                    const h = parseInstagram(insta);
+                    if (h) setInsta(h);
+                  }}
                 />
               </div>
+              <FieldError id="e-instagramHandle" msg={fieldErr.instagramHandle} />
               <p className="text-xs text-muted">Shown as a link on your store. We never read your profile.</p>
             </div>
           ) : (

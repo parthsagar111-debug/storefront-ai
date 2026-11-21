@@ -5,6 +5,7 @@ import { validateDraft, storeCounts } from "@/lib/server/rules";
 import { Format } from "@/lib/ai/schemas";
 import { priceFor } from "@/lib/pricing";
 import { normalizeIndianMobile } from "@/lib/whatsapp";
+import { normalizeInstagram, HANDLE_RE } from "@/lib/instagram";
 
 export async function GET(_req: Request, ctx: RouteContext<"/api/stores/[token]">) {
   const { token } = await ctx.params;
@@ -21,9 +22,8 @@ const CreatorPatch = z
     bio: z.string().trim().min(20).max(320),
     instagramHandle: z
       .string()
-      .trim()
-      .transform((s) => s.replace(/^@/, ""))
-      .refine((s) => s === "" || /^[A-Za-z0-9._]{1,30}$/.test(s), "invalid handle"),
+      .transform((s) => normalizeInstagram(s))
+      .refine((s) => s === "" || HANDLE_RE.test(s), "invalid handle"),
     whatsapp: z.string().trim(),
   })
   .partial();

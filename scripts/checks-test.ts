@@ -1,5 +1,6 @@
 // Unit checks for the deterministic rules (SPEC §7.4). Run: npx tsx --conditions=react-server scripts/checks-test.ts
 import { scrubTierReason, checkClaims, sensitiveDomain, enforceLadder, toStoredProduct, checkDistinct, acceptProduct } from "../src/lib/ai/build-store";
+import { parseInstagram } from "../src/lib/instagram";
 import type { StoreInput } from "../src/lib/server/input";
 import type { TModelProduct, TStoreContent } from "../src/lib/ai/schemas";
 
@@ -44,4 +45,12 @@ t("ladder: course + cohort fails", throws(() => enforceLadder([toStoredProduct(m
   t("product regen: used format rejected", throws(() => acceptProduct(mp("recorded_course", "low", "z"), input(), store, entryId)));
   t("product regen: entry-ineligible replacement fails", throws(() => acceptProduct(mp("cohort_course", "low", "q"), input(), store, entryId)));
 }
+// QA-02 Instagram parsing
+for (const [raw, want] of [
+  ["https://instagram.com/qa.handle", "qa.handle"], ["https://www.instagram.com/qa_handle/", "qa_handle"],
+  ["instagram.com/qa.handle?igsh=abc123", "qa.handle"], ["http://m.instagram.com/QA.Handle/#x", "QA.Handle"],
+  ["@ananyas.kitchen", "ananyas.kitchen"], ["  ananyas.kitchen  ", "ananyas.kitchen"], ["", ""],
+] as const) t(`instagram: "${raw}" → "${want}"`, parseInstagram(raw) === want, String(parseInstagram(raw)));
+for (const raw of ["qa handle!", "@@qa", "qa#handle", "https://instagram.com/", "https://facebook.com/qa", "a".repeat(31)])
+  t(`instagram: "${raw.slice(0, 32)}" rejected`, parseInstagram(raw) === null, String(parseInstagram(raw)));
 console.log(fail ? `${fail} FAILED` : "ALL PASSED"); process.exit(fail ? 1 : 0);
