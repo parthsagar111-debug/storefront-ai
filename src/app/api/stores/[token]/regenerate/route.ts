@@ -15,12 +15,15 @@ import { systemPrompt, bioUserPrompt, productUserPrompt, generationUserPrompt } 
 import { parseGeneration, buildStoreContent, acceptBio, acceptProduct, normalizeModelOutput } from "@/lib/ai/build-store";
 import { CheckFailed } from "@/lib/ai/pipeline";
 import { ENTRY_MAX } from "@/lib/pricing";
+import { HINT_MAX } from "@/lib/ai/prompts";
 
 export const maxDuration = 60;
 
+// SPEC v5 V2/V4: optional "What should change?" hint (≤ 120 chars) for bio and product regenerate.
+const Hint = z.string().trim().max(HINT_MAX).optional();
 const Body = z.discriminatedUnion("target", [
-  z.object({ target: z.literal("bio") }),
-  z.object({ target: z.literal("product"), productId: z.string() }),
+  z.object({ target: z.literal("bio"), hint: Hint }),
+  z.object({ target: z.literal("product"), productId: z.string(), hint: Hint }),
   z.object({ target: z.literal("all") }),
 ]);
 
@@ -43,7 +46,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/stores/[token]/
   const body = Body.safeParse(await req.json().catch(() => null));
   if (!body.success) return Response.json({ error: "bad_request" }, { status: 400 });
   if (await generationLimited(store.id)) return tooMany(); // T19 shared limit
-  await logEvent(store.id, "section_regenerated", { target: body.data.target });
+  await logEvent(store.id, "section_regenerated", { target: body.data.target, hint: "hint" in body.data && Boolean(body.data.hint) });
 
   // The AI sees (and validates against) the draft as it was when the request started…
   const draft = store.draft;
@@ -59,7 +62,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/stores/[token]/
       label: `regen bio ${store.slug}`,
       budgetMs: SECTION_BUDGET_MS,
       system,
-      user: bioUserPrompt(ci, current),
+      user: bioUserPrompt(ci, current, body.data.hint),
       schema: BioResultSchema,
       accept: (raw) => {
         const r = BioResult.safeParse(normalizeModelOutput(raw));
@@ -80,16 +83,18 @@ export async function POST(req: Request, ctx: RouteContext<"/api/stores/[token]/
       label: `regen product ${store.slug}`,
       budgetMs: SECTION_BUDGET_MS,
       system,
-      user: productUserPrompt(ci, current, target.title, others.map((p) => p.format), mustBeEntry),
+      user: productUserPrompt(ci, current, target.title, others.map((p) => p.format), mustBeEntry, body.data.hint),
       schema: ProductResultSchema,
       accept: (raw) => {
         const r = ProductResult.safeParse(normalizeModelOutput(raw));
         if (!r.success) throw new CheckFailed("zod: " + r.error.message.slice(0, 300));
-        acceptProduct(r.data.product, input, draft, productId); // checks → fallback model on failure
+        acceptProduct(r.data.product, input, draft, productId); // whole-set checks → fallback model on failure
         return r.data.product;
       },
     });
-    if (!out.ok) return Response.json({ error: "ai_failed" }, { status: 502 });
+    // SPEC v5 V2: no valid set from either model → keep the old product, tell the creator.
+    // (No `message`: the editor shows "Couldn't regenerate, kept your previous version.")
+    if (!out.ok) return Response.json({ draft, draftRev: store.draft_rev, kept: true });
     const modelProduct = out.result.value;
     apply = (latest) => {
       // Edited in another tab meanwhile: keep those edits, swap only this product (same slot, new id — T20).

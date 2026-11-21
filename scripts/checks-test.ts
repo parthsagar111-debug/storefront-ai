@@ -41,9 +41,14 @@ t("ladder: course + cohort fails", throws(() => enforceLadder([toStoredProduct(m
   const store: TStoreContent = { creator: { displayName: "A", headline: "h", bio: "b" }, language: "en", theme: "saffron", sensitiveDomain: "none",
     products: [toStoredProduct(mp("ebook", "low"), "none"), toStoredProduct(mp("recorded_course", "typical"), "none")] };
   const entryId = store.products[0].id;
-  const next = acceptProduct(mp("one_on_one", "high"), input(), store, entryId);
+  // Round 3 item 3: the whole set is validated; no silent re-tiering of a non-entry replacement.
+  t("product regen: replacing the only entry with one_on_one high → set invalid", throws(() => acceptProduct(mp("one_on_one", "high"), input(), store, entryId)));
+  const next = acceptProduct(mp("one_on_one", "low"), input(), store, entryId);
   const fresh = next.find((p) => p.format === "one_on_one")!;
-  t("product regen: entry replaced → forced entry tier", fresh.tier === "low" && fresh.price === 299, `${fresh.tier} ${fresh.price}`);
+  t("product regen: one_on_one low (₹299) is a valid entry replacement", fresh.tier === "low" && fresh.price === 299, `${fresh.tier} ${fresh.price}`);
+  t("product regen: community high (₹399) is a valid entry replacement", !throws(() => acceptProduct(mp("community", "high"), input(), store, entryId)));
+  t("product regen: duplicate title rejected", throws(() => acceptProduct(mp("template_pack", "low", "recorded_course"), input(), store, entryId)));
+  t("product regen: non-entry replacement fine when another entry remains", !throws(() => acceptProduct(mp("cohort_course", "high", "c2"), input(), { ...store, products: [...store.products, toStoredProduct(mp("template_pack", "low"), "none")] }, store.products[1].id)));
   t("product regen: new id (T20)", fresh.id !== entryId);
   t("product regen: other product untouched", next[1].id === store.products[1].id);
   t("product regen: used format rejected", throws(() => acceptProduct(mp("recorded_course", "low", "z"), input(), store, entryId)));

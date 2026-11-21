@@ -233,22 +233,24 @@ export function acceptBio(r: { headline: string; bio: string }, input: StoreInpu
 }
 
 /**
- * Product regenerate: same checks as full generation (T25) — unique format/title vs the kept products,
- * claims, tier mapping, and the ladder across the whole store. New id (T20).
+ * SPEC v5 V2 / PROMPTS v5 §4: a set is valid when every format is unique, titles are distinct and at least
+ * one product is an entry product (≤ ₹499).
+ */
+export function checkProductSet(products: TProduct[]) {
+  checkDistinct(products);
+  if (!products.some((x) => x.price <= ENTRY_MAX)) throw new CheckFailed("set: no entry product after replacement");
+}
+
+/**
+ * Product regenerate: same checks as full generation (T25) — claims and tier mapping on the new product, then
+ * the WHOLE set after replacement (unique formats, an entry product). No silent re-tiering: an invalid set fails
+ * the attempt (→ fallback model); if that fails too, the route keeps the old product. New id (T20).
  */
 export function acceptProduct(p: TModelProduct, input: StoreInput, store: TStoreContent, replaceId: string): TProduct[] {
-  const others = store.products.filter((x) => x.id !== replaceId);
-  checkDistinct([...others, p]);
   checkClaims(productTexts(p), input, store.sensitiveDomain);
   const fresh = toStoredProduct(p, store.sensitiveDomain);
   const next = store.products.map((x) => (x.id === replaceId ? fresh : x));
-  if (!next.some((x) => x.price <= ENTRY_MAX)) {
-    // The replaced product was the entry product: the new one must be entry-eligible itself.
-    const tiers = entryTiers(fresh.format);
-    if (!tiers.length) throw new CheckFailed("ladder: replacement not entry-eligible");
-    fresh.tier = tiers[tiers.length - 1];
-    fresh.price = priceFor(fresh.format, fresh.tier);
-  }
+  checkProductSet(next);
   return next;
 }
 
