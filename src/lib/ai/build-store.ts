@@ -166,3 +166,26 @@ export function acceptProduct(p: TModelProduct, input: StoreInput, store: TStore
   }
   return next;
 }
+
+/** S2b: at most this many clarification rounds; after the last one, generation must return "ok". */
+export const MAX_FOLLOW_UP_ROUNDS = 2;
+
+export type GenOutcome =
+  | { kind: "ok"; content: TStoreContent }
+  | { kind: "needs_more"; question: string; directions: string[] }
+  | { kind: "unclear"; reason: string };
+
+/**
+ * Full-generation accept step. IQA-03: on the final round (`finalRound`), a needs_more answer is a failed
+ * attempt (→ fallback model → Retry state), so a third question screen can never appear.
+ */
+export function acceptGeneration(raw: unknown, input: StoreInput, existing: TStoreContent | null, finalRound: boolean): GenOutcome {
+  const r = parseGeneration(raw);
+  if (r.status === "ok") return { kind: "ok", content: buildStoreContent(r, input, existing) };
+  if (r.status === "needs_more") {
+    if (finalRound) throw new CheckFailed("needs_more after the last allowed follow-up round");
+    return { kind: "needs_more", question: r.question, directions: r.directions };
+  }
+  return { kind: "unclear", reason: r.reason };
+}
+

@@ -90,7 +90,7 @@ function creatorBlock(i: CreatorInput, opts: { audienceSize: boolean; directionL
 }
 
 /** §2 Full generation (and Regenerate all when currentStoreJson is given). */
-export function generationUserPrompt(i: CreatorInput, currentStoreJson?: string): string {
+export function generationUserPrompt(i: CreatorInput, currentStoreJson?: string, opts: { finalRound?: boolean } = {}): string {
   let msg = `Create a storefront for this creator.
 
 ${creatorBlock(i, { audienceSize: true, directionLabel: "Direction chosen by the creator" })}
@@ -99,7 +99,9 @@ First decide if there is enough to work with:
 - status "unclear": the input is gibberish, offensive, unsafe, or does not describe a skill or a person who helps others. Put a short, friendly reason in "reason".
 - status "needs_more": it is a real skill but too broad or vague to choose products (for example "fitness" for "people"). Ask ONE short question in "question" and give exactly 3 "directions": specific, different niches this creator might mean, each under 60 characters (for example "Home workouts for new moms").${
     i.direction
-      ? `\n  The creator has already chosen a direction. Only return needs_more if the input is still impossible to work with.`
+      ? opts.finalRound
+        ? `\n  The creator has already answered the follow-up question twice. Do NOT return needs_more: return status "ok" and build the store around the chosen direction.`
+        : `\n  The creator has already chosen a direction. Only return needs_more if the input is still impossible to work with.`
       : ""
   }
 - status "ok": write the headline, bio, sensitiveDomain and 2 to 4 products.`;

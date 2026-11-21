@@ -2,8 +2,7 @@ import "server-only";
 import { db, logEvent, type StoreRow, type FollowUp } from "./db";
 import { toCreatorInput } from "./input";
 import { runWithFallback } from "@/lib/ai/pipeline";
-import { parseGeneration, buildStoreContent } from "@/lib/ai/build-store";
-import { type TStoreContent } from "@/lib/ai/schemas";
+import { acceptGeneration, MAX_FOLLOW_UP_ROUNDS, type GenOutcome } from "@/lib/ai/build-store";
 import { GenerationResultUnionSchema } from "@/lib/ai/response-schemas";
 import { systemPrompt, generationUserPrompt } from "@/lib/ai/prompts";
 
@@ -16,10 +15,6 @@ export async function claimGeneration(storeId: string): Promise<StoreRow | null>
   return (data as StoreRow[])?.[0] ?? null;
 }
 
-type GenOutcome =
-  | { kind: "ok"; content: TStoreContent }
-  | { kind: "needs_more"; question: string; directions: string[] }
-  | { kind: "unclear"; reason: string };
 
 /**
  * Full generation for a store. Safe to call from several places at once: only the claim winner runs.
@@ -35,18 +30,15 @@ export async function runGeneration(storeId: string, preClaimed?: StoreRow): Pro
   await logEvent(storeId, "generation_started", { attempt: store.gen_attempts });
 
   const input = store.input;
+  // IQA-03: the creator has answered the last allowed follow-up round → the model must return "ok".
+  const finalRound = store.follow_up?.kind === "needs_more" && store.follow_up.round >= MAX_FOLLOW_UP_ROUNDS && Boolean(input.direction);
   const out = await runWithFallback<GenOutcome>({
     label: `generate ${store.slug}`,
     budgetMs: GENERATION_BUDGET_MS,
     system: systemPrompt(input.language),
-    user: generationUserPrompt(toCreatorInput(input)),
+    user: generationUserPrompt(toCreatorInput(input), undefined, { finalRound }),
     schema: GenerationResultUnionSchema,
-    accept: (raw) => {
-      const r = parseGeneration(raw);
-      if (r.status === "ok") return { kind: "ok", content: buildStoreContent(r, input, store.draft) };
-      if (r.status === "needs_more") return { kind: "needs_more", question: r.question, directions: r.directions };
-      return { kind: "unclear", reason: r.reason };
-    },
+    accept: (raw) => acceptGeneration(raw, input, store.draft, finalRound),
   });
 
   // Only the run that still holds the claim may write (guards against a stale run finishing late).

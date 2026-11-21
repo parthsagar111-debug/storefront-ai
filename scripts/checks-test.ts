@@ -1,5 +1,6 @@
 // Unit checks for the deterministic rules (SPEC §7.4). Run: npx tsx --conditions=react-server scripts/checks-test.ts
-import { scrubTierReason, checkClaims, sensitiveDomain, enforceLadder, toStoredProduct, checkDistinct, acceptProduct, buildStoreContent } from "../src/lib/ai/build-store";
+import { scrubTierReason, checkClaims, sensitiveDomain, enforceLadder, toStoredProduct, checkDistinct, acceptProduct, buildStoreContent, acceptGeneration } from "../src/lib/ai/build-store";
+import { generationUserPrompt } from "../src/lib/ai/prompts";
 import { parseInstagram } from "../src/lib/instagram";
 import type { StoreInput } from "../src/lib/server/input";
 import type { TModelProduct, TStoreContent } from "../src/lib/ai/schemas";
@@ -55,6 +56,16 @@ t("ladder: course + cohort fails", throws(() => enforceLadder([toStoredProduct(m
   t("order: equal prices keep model order", tie.products.map((p) => p.format).join(",") === "ebook,community,one_on_one", tie.products.map((p) => p.format).join(","));
   const replaced = acceptProduct(mp("cohort_course", "typical", "new"), input(), s, s.products[1].id);
   t("order: product regenerate keeps its slot (no re-sort)", replaced[1].format === "cohort_course" && replaced.map((p) => p.price).join(",") === "199,4999,1499" && replaced[0].id === s.products[0].id, replaced.map((p) => p.price).join(","));
+}
+// IQA-03 follow-up rounds can't loop
+{
+  const nm = { status: "needs_more", question: "Fitness for whom?", directions: ["Home workouts for new moms", "Desk-worker fat loss", "Strength for beginners"] };
+  t("rounds: needs_more allowed before the last round", acceptGeneration(nm, input({ direction: "fitness" }), null, false).kind === "needs_more");
+  t("rounds: needs_more on the final round fails the attempt", throws(() => acceptGeneration(nm, input({ direction: "fitness" }), null, true)));
+  t("rounds: unclear on the final round is still allowed", acceptGeneration({ status: "unclear", reason: "x" }, input(), null, true).kind === "unclear");
+  const ci = { name: "A", expertise: "fitness", audience: "people", outcome: "fit", audienceSize: "Under 5K followers", language: "en" as const, direction: "Strength for beginners" };
+  t("rounds: final-round prompt forbids needs_more", /Do NOT return needs_more: return status "ok"/.test(generationUserPrompt(ci, undefined, { finalRound: true })));
+  t("rounds: earlier rounds keep the normal instruction", /Only return needs_more if the input is still impossible/.test(generationUserPrompt(ci)));
 }
 // QA-02 Instagram parsing
 for (const [raw, want] of [
