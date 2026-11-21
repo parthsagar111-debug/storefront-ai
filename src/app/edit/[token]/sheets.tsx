@@ -416,7 +416,7 @@ export function PublishSheet({
             disabled={busy}
             onClick={() => (normalizeIndianMobile(wa) ? publish(wa) : setErr("Enter a 10-digit Indian mobile number."))}
           >
-            {busy ? "Publishing…" : "Add & publish"}
+            {busy ? "Publishing…" : "Publish with WhatsApp"}
           </Button>
           <div className="space-y-2">
             <button
@@ -425,12 +425,12 @@ export function PublishSheet({
               className={btnClass("secondary", "lg", "w-full border-saffron/40")}
               onClick={() => publish()}
             >
-              Skip, show &quot;I&apos;m interested&quot; instead
+              Publish without WhatsApp
             </button>
             <p className="text-center text-xs leading-relaxed text-muted">
               {anyAvailable
-                ? "Skip is off because a product is Available now. Buyers need a number to reach you."
-                : "Visitors tap “I'm interested” and you see which idea they want most."}
+                ? "Publish without WhatsApp is off because a product is Available now. Buyers need a number to reach you."
+                : "Coming-soon products always show an I'm interested button. WhatsApp adds an Ask on WhatsApp option."}
             </p>
           </div>
         </div>

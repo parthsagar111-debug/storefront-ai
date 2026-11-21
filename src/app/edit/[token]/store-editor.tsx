@@ -142,13 +142,13 @@ export default function StoreEditor({
   const toolBase = "inline-flex min-h-11 items-center gap-1.5 rounded-xl border px-3 text-sm font-bold disabled:opacity-40";
   const tool = `${toolBase} border-line-input bg-surface text-ink`;
 
-  const editRegen = (onEdit: () => void, onRegen: () => void, editing = false, label = "") => (
+  const editRegen = (onEdit: () => void, onRegen: () => void, editing = false, label = "", regenLabel = `Regenerate ${label}`) => (
     <div className="ml-auto flex gap-2">
       <button type="button" className={editing ? `${toolBase} border-saffron bg-saffron text-white` : tool} disabled={anyBusy} onClick={onEdit} aria-label={`Edit ${label}`}>
         <IconPencil size={16} />
         {editing ? "Editing" : "Edit"}
       </button>
-      <button type="button" className={`${tool} w-11 justify-center px-0`} disabled={anyBusy} onClick={onRegen} aria-label={`Regenerate ${label}`}>
+      <button type="button" className={`${tool} w-11 justify-center px-0`} disabled={anyBusy} onClick={onRegen} aria-label={regenLabel}>
         <IconRefresh size={18} />
       </button>
     </div>
@@ -172,6 +172,7 @@ export default function StoreEditor({
         () => regenerate({ target: "product", productId: p.id }),
         editingId === p.id,
         p.title,
+        `Regenerate product: ${p.title}`, // SPEC v4.5 S3 accessible name
       )}
     </>
   );
@@ -315,7 +316,7 @@ export default function StoreEditor({
             content={draft}
             busy={busy}
             highlightId={editingId}
-            headerToolbar={editRegen(() => setSheet({ kind: "header" }), () => regenerate({ target: "bio" }), sheet?.kind === "header", "header")}
+            headerToolbar={editRegen(() => setSheet({ kind: "header" }), () => regenerate({ target: "bio" }), sheet?.kind === "header", "header", "Regenerate bio")}
             productToolbar={productToolbar}
             productNote={productNote}
             productFooter={productFooter}
