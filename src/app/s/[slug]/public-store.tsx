@@ -33,6 +33,8 @@ function loadTapped(slug: string): string[] {
 export default function PublicStore({ slug, content }: { slug: string; content: TStoreContent }) {
   const vid = useRef<string>("");
   const [tapped, setTapped] = useState<string[]>([]);
+  // IQA-02: per-product send state; "Thanks!" only after the server confirms.
+  const [sending, setSending] = useState<Record<string, "sending" | "failed">>({});
   const c = content.creator;
   const firstName = c.displayName.split(/\s+/)[0];
   const t = THEMES[content.theme];
@@ -53,14 +55,33 @@ export default function PublicStore({ slug, content }: { slug: string; content: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
-  const interested = (p: TProduct) => {
-    if (tapped.includes(p.id)) return;
-    const next = [...tapped, p.id];
-    setTapped(next);
+  /** IQA-02: show "Thanks!" and remember the tap only after /api/events returns 2xx (204 "already counted" included). */
+  const interested = async (p: TProduct) => {
+    if (tapped.includes(p.id) || sending[p.id] === "sending") return;
+    setSending((s) => ({ ...s, [p.id]: "sending" }));
+    let ok = false;
     try {
-      localStorage.setItem(tappedKey(slug), JSON.stringify(next));
-    } catch {}
-    send("interest_tapped", p.id);
+      const res = await fetch("/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug, type: "interest_tapped", productId: p.id, visitorId: vid.current }),
+      });
+      ok = res.ok;
+    } catch {
+      ok = false;
+    }
+    if (!ok) {
+      setSending((s) => ({ ...s, [p.id]: "failed" }));
+      return;
+    }
+    setSending(({ [p.id]: _done, ...rest }) => (void _done, rest));
+    setTapped((prev) => {
+      const next = prev.includes(p.id) ? prev : [...prev, p.id];
+      try {
+        localStorage.setItem(tappedKey(slug), JSON.stringify(next));
+      } catch {}
+      return next;
+    });
   };
 
   const primary = "flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl px-4 text-base font-bold text-white";
@@ -92,9 +113,23 @@ export default function PublicStore({ slug, content }: { slug: string; content: 
             Thanks! {firstName} will see that you&apos;re interested.
           </p>
         ) : (
-          <button type="button" className={primary} style={{ background: t.accent }} onClick={() => interested(p)}>
-            I&apos;m interested
-          </button>
+          <>
+            <button
+              type="button"
+              className={primary}
+              style={{ background: t.accent }}
+              disabled={sending[p.id] === "sending"}
+              aria-busy={sending[p.id] === "sending"}
+              onClick={() => interested(p)}
+            >
+              {sending[p.id] === "sending" ? "Sending…" : sending[p.id] === "failed" ? "Tap to try again" : "I'm interested"}
+            </button>
+            {sending[p.id] === "failed" && (
+              <p className="text-center text-sm font-semibold text-danger" role="alert">
+                Couldn&apos;t send that. Tap to try again.
+              </p>
+            )}
+          </>
         )}
         {(c.whatsapp || c.instagramHandle) && (
           <div className="flex flex-wrap justify-center gap-x-6">
