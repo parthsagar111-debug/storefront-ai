@@ -7,6 +7,7 @@ import { IconPencil, IconRefresh, IconArrowUpRight, IconChevronDown, IconChevron
 import type { TStoreContent, TProduct } from "@/lib/ai/schemas";
 import { FORMAT_LABEL, rangeFor, formatINR, ENTRY_MAX } from "@/lib/pricing";
 import { HeaderSheet, ProductSheet, PublishSheet, type PatchFn } from "./sheets";
+import { removeStore } from "@/lib/client/device";
 
 export interface Counts {
   views: number;
@@ -43,6 +44,11 @@ export default function StoreEditor({
   const [busy, setBusy] = useState<Busy>({});
   const [sheet, setSheet] = useState<{ kind: "header" } | { kind: "product"; id: string } | { kind: "publish" } | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
+  // T29: overflow menu → Delete store → confirm → deleted view.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleted, setDeleted] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [why, setWhy] = useState<string | null>(null);
   const [noteSeen, setNoteSeen] = useState(true);
@@ -109,6 +115,24 @@ export default function StoreEditor({
       flash("Couldn't regenerate, kept your previous version.");
     }
     setBusy({});
+  };
+
+  const deleteStore = async () => {
+    setDeleting(true);
+    try {
+      const res = await fetch(api, { method: "DELETE" });
+      if (res.ok) {
+        removeStore(token);
+        setConfirmDelete(false);
+        setDeleted(true);
+        return;
+      }
+      flash(res.status === 404 ? "This store no longer exists." : "Couldn't delete the store. Please try again.");
+    } catch {
+      flash("Couldn't delete the store. Please try again.");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const anyBusy = Boolean(busy.header || busy.productId || busy.all);
@@ -197,6 +221,18 @@ export default function StoreEditor({
   const editingProduct = editingId ? draft.products.find((p) => p.id === editingId) : null;
   const publishLabel = publishedAt && !dirty ? "Published" : "Publish";
 
+  if (deleted) {
+    return (
+      <div className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col justify-center gap-4 px-5 py-16" role="status">
+        <h1 className="font-display text-[28px] font-bold leading-tight">Store deleted</h1>
+        <p className="text-muted">Its public page no longer works, and it&apos;s been removed from this device.</p>
+        <Link href="/" className={btnClass("primary", "lg", "w-full")}>
+          Create a new store
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-dvh">
       {/* Top bar: mobile = name + badge + View live; ≥ md = logo, actions (D6 desktop frame). */}
@@ -224,6 +260,34 @@ export default function StoreEditor({
           <Link href={`/?edit=${encodeURIComponent(token)}`} className={btnClass("secondary", "sm", "shrink-0 whitespace-nowrap")}>
             Edit answers
           </Link>
+          {/* T29: overflow menu */}
+          <div className="relative">
+            <button
+              type="button"
+              aria-label="More actions"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              className={btnClass("secondary", "sm", "min-w-11 px-0 text-lg leading-none")}
+              onClick={() => setMenuOpen(!menuOpen)}
+            >
+              ⋯
+            </button>
+            {menuOpen && (
+              <div role="menu" className="absolute right-0 top-full z-40 mt-2 w-48 overflow-hidden rounded-2xl border border-line bg-surface py-1 shadow-card">
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex min-h-11 w-full items-center px-4 text-left text-sm font-bold text-danger active:bg-sand"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setConfirmDelete(true);
+                  }}
+                >
+                  Delete store
+                </button>
+              </div>
+            )}
+          </div>
           <div className="hidden gap-2 md:flex">
             <Button variant="secondary" size="sm" disabled={anyBusy} onClick={() => setConfirmAll(true)}>
               <IconRefresh size={16} />
@@ -294,6 +358,23 @@ export default function StoreEditor({
               >
                 Regenerate all
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-scrim/70 p-4 md:items-center" role="dialog" aria-modal aria-label="Delete store">
+          <div className="w-full max-w-sm space-y-4 rounded-[24px] bg-surface p-5">
+            <p className="font-display text-xl font-bold">Delete this store?</p>
+            <p className="text-sm text-muted">Its public page will stop working. This can&apos;t be undone.</p>
+            <div className="flex gap-2">
+              <Button variant="secondary" className="flex-1" disabled={deleting} onClick={() => setConfirmDelete(false)}>
+                Cancel
+              </Button>
+              <button type="button" disabled={deleting} className={btnClass("primary", "md", "flex-1 bg-danger! shadow-none!")} onClick={deleteStore}>
+                {deleting ? "Deleting…" : "Delete store"}
+              </button>
             </div>
           </div>
         </div>

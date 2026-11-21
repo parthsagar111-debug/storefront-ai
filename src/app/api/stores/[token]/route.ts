@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { logEvent } from "@/lib/server/db";
+import { db, logEvent } from "@/lib/server/db";
 import { storeForToken, editorView, notFound } from "@/lib/server/store-access";
 import { validateDraft, storeCounts } from "@/lib/server/rules";
 import { Format, type TStoreContent } from "@/lib/ai/schemas";
@@ -110,4 +110,18 @@ export async function PATCH(req: Request, ctx: RouteContext<"/api/stores/[token]
   if (!w.ok) return w.response;
   await logEvent(store.id, "section_edited", { section: product ? "product" : creator ? "header" : "theme" });
   return Response.json({ draft: w.draft, draftRev: w.draftRev, hasUnpublishedChanges: Boolean(w.row.published) });
+}
+
+/**
+ * T29 Delete store (SPEC v4.5): token check, then delete the row; events go with it (ON DELETE CASCADE).
+ * /s/<slug> shows S6 afterwards. A wrong or malformed token gets 404 and deletes nothing.
+ */
+export async function DELETE(_req: Request, ctx: RouteContext<"/api/stores/[token]">) {
+  const { token } = await ctx.params;
+  const store = await storeForToken(token);
+  if (!store) return notFound();
+  const { data, error } = await db().from("stores").delete().eq("id", store.id).select("id");
+  if (error) return Response.json({ error: "server_error" }, { status: 500 });
+  if (!data?.length) return notFound();
+  return Response.json({ deleted: true });
 }

@@ -52,6 +52,11 @@ export function updateStore(token: string, patch: Partial<SavedStore>) {
   write(listStores().map((s) => (s.token === token ? { ...s, ...patch } : s)));
 }
 
+/** T29: forget a deleted store on this device. */
+export function removeStore(token: string) {
+  write(listStores().filter((s) => s.token !== token));
+}
+
 /** 24 random bytes → base64url (32 chars). Generated in the browser; the server only stores sha256 (T11). */
 export function newToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(24));
