@@ -66,7 +66,17 @@ function tooThin(s: string) {
   return t.length < 2 || (c.length >= 5 && new Set(c).size === 1);
 }
 
+/**
+ * Next 16 keeps visited routes mounted (React Activity) and restores their state on navigation.
+ * S1's mode and prefill come from the URL (?edit= / ?from=), so a push navigation must remount the
+ * form; browser back/forward still restores it (bfcacheId changes only on push/replace).
+ */
 export default function CreateForm() {
+  const { bfcacheId } = useRouter();
+  return <CreateFormInner key={bfcacheId} />;
+}
+
+function CreateFormInner() {
   const router = useRouter();
   const [v, setV] = useState<Record<Field, string>>({ name: "", expertise: "", audience: "", outcome: "" });
   const [size, setSize] = useState<string>("");

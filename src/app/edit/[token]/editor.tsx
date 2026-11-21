@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { NotFoundView } from "@/components/not-found-view";
 import { btnClass, inputCls } from "@/components/ui";
 import { IconAlert, IconCheck, IconChevronLeft, IconChevronRight, IconLoader, IconRefresh } from "@/components/icons";
@@ -25,7 +26,16 @@ const LINES = [
 
 type Load = { state: "loading" } | { state: "missing" } | { state: "ok"; store: EditorView & { counts: Counts | null } };
 
+/**
+ * Next 16 keeps visited routes mounted (React Activity). After "Edit answers" the editor must re-fetch
+ * and poll the new generation, so a push navigation remounts it (back/forward still restores state).
+ */
 export default function Editor({ params }: { params: Promise<{ token: string }> }) {
+  const { bfcacheId } = useRouter();
+  return <EditorInner key={bfcacheId} params={params} />;
+}
+
+function EditorInner({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params);
   const [load, setLoad] = useState<Load>({ state: "loading" });
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
