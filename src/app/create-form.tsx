@@ -76,6 +76,7 @@ export default function CreateForm() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErr, setFieldErr] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Set<string>>(new Set());
   const [recent, setRecent] = useState<SavedStore | null>(null);
   const [noStorage, setNoStorage] = useState(false);
   const [onceLink, setOnceLink] = useState<string | null>(null);
@@ -172,6 +173,12 @@ export default function CreateForm() {
   }
 
   const label = "block text-sm font-bold";
+  // QA-07: on blur, a touched field that the client check would block shows its message under the field.
+  const blurCheck = (f: Field) => {
+    if (v[f] !== "" || touched.has(f)) {
+      if (tooThin(v[f])) setFieldErr((e) => ({ ...e, [f]: FIELD_MESSAGES[f] }));
+    }
+  };
   const clearErr = (f: string) => fieldErr[f] && setFieldErr(({ [f]: _gone, ...rest }) => (void _gone, rest));
 
   if (onceLink) {
@@ -243,8 +250,10 @@ export default function CreateForm() {
             aria-describedby={fieldErr.name ? "e-name" : undefined}
             onChange={(e) => {
               setV({ ...v, name: e.target.value });
+              setTouched((t) => new Set(t).add("name"));
               clearErr("name");
             }}
+            onBlur={() => blurCheck("name")}
           />
           <FieldError id="e-name" msg={fieldErr.name} />
         </div>
@@ -264,8 +273,10 @@ export default function CreateForm() {
               aria-describedby={fieldErr[k] ? `e-${k}` : undefined}
               onChange={(e) => {
                 setV({ ...v, [k]: e.target.value });
+                setTouched((t) => new Set(t).add(k));
                 clearErr(k);
               }}
+              onBlur={() => blurCheck(k)}
             />
             <FieldError id={`e-${k}`} msg={fieldErr[k]} />
             <div className="flex flex-wrap gap-2">
