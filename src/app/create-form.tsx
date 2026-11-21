@@ -80,16 +80,23 @@ export default function CreateForm() {
   const [recent, setRecent] = useState<SavedStore | null>(null);
   const [noStorage, setNoStorage] = useState(false);
   const [onceLink, setOnceLink] = useState<string | null>(null);
+  // T28: /?edit=<token> → same store, new answers → confirm → regenerate.
+  const [editToken, setEditToken] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   // S2c "unclear" → back to S1 with the previous answers prefilled (/?from=<token>).
+  // T28 "Edit answers" → /?edit=<token>: prefilled, and submitting regenerates that same store.
   useEffect(() => {
-    const from = new URLSearchParams(location.search).get("from");
+    const q = new URLSearchParams(location.search);
+    const edit = q.get("edit");
+    const from = edit ?? q.get("from");
     if (!from) return;
     fetch(`/api/stores/${encodeURIComponent(from)}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((s) => {
         const i = s?.input;
         if (!i) return;
+        if (edit) setEditToken(edit);
         setV({ name: i.name ?? "", expertise: i.expertise ?? "", audience: i.audience ?? "", outcome: i.outcome ?? "" });
         setSize(i.audienceSize ?? "");
         setLang(i.language ?? "en");
@@ -131,6 +138,10 @@ export default function CreateForm() {
       document.getElementById("f-insta")?.focus();
       return;
     }
+    if (editToken) {
+      setConfirmOpen(true); // T28: confirm before replacing the bio and products
+      return;
+    }
     setBusy(true);
     setError(null);
     setFieldErr({});
@@ -169,6 +180,47 @@ export default function CreateForm() {
         : r.status === 400
           ? "Please check your answers and try again."
           : "Couldn't reach the server. Your answers are saved, tap Create again.",
+    );
+  }
+
+  /** T28: regenerate the SAME store with the new answers (shared per-store limit; published page untouched). */
+  async function regenerateWithNewAnswers() {
+    if (!editToken) return;
+    setConfirmOpen(false);
+    setBusy(true);
+    setError(null);
+    setFieldErr({});
+    const handle = parseInstagram(insta) || undefined;
+    const input = { ...v, audienceSize: size, language: lang, instagramHandle: handle };
+    let res: Response | null = null;
+    try {
+      res = await fetch(`/api/stores/${encodeURIComponent(editToken)}/answers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input }),
+      });
+    } catch {
+      res = null;
+    }
+    const body = res ? await res.json().catch(() => ({})) : {};
+    if (res?.ok) {
+      updateStore(editToken, { name: v.name.trim() });
+      router.push(`/edit/${editToken}`);
+      return;
+    }
+    setBusy(false);
+    const known = (res?.status === 400 && Array.isArray(body.issues) ? (body.issues as string[]) : []).map((p) => p.split(".")[0]).filter((f) => f in FIELD_MESSAGES);
+    if (known.length) {
+      setFieldErr(Object.fromEntries(known.map((f) => [f, FIELD_MESSAGES[f]])));
+      document.getElementById(FIELD_INPUT_ID[known[0]])?.focus();
+      return;
+    }
+    setError(
+      !res
+        ? "Couldn't reach the server. Your answers are still here, tap again."
+        : res.status === 429
+          ? "Too many regenerations for this store. Try again in a while."
+          : body.message ?? "Couldn't regenerate your store. Please try again.",
     );
   }
 
@@ -215,7 +267,7 @@ export default function CreateForm() {
       <div className="flex-1 space-y-6 px-5 pb-6 pt-5 [&_input]:scroll-mb-32 [&_input]:scroll-mt-4">
 
         <Logo />
-        {recent && (
+        {!editToken && recent && (
           <Link
             href={`/edit/${recent.token}`}
             className="flex min-h-12 items-center justify-between gap-3 rounded-2xl bg-saffron-soft px-4 py-3 text-sm font-bold text-saffron-ink"
@@ -224,10 +276,20 @@ export default function CreateForm() {
             <IconArrowUpRight size={16} className="shrink-0" />
           </Link>
         )}
-        <header className="space-y-2">
-          <h1 className="font-display text-[32px] font-bold leading-[1.1]">Turn what you know into a store people buy from.</h1>
-          <p className="text-muted">A few quick answers. Your store in about a minute.</p>
-        </header>
+        {editToken ? (
+          <header className="space-y-2">
+            <Link href={`/edit/${editToken}`} className="inline-flex min-h-11 items-center text-sm font-semibold text-saffron underline underline-offset-4">
+              ← Back to my store
+            </Link>
+            <h1 className="font-display text-[32px] font-bold leading-[1.1]">Edit your answers</h1>
+            <p className="text-muted">Same store, same link. Your published page stays as it is until you publish again.</p>
+          </header>
+        ) : (
+          <header className="space-y-2">
+            <h1 className="font-display text-[32px] font-bold leading-[1.1]">Turn what you know into a store people buy from.</h1>
+            <p className="text-muted">A few quick answers. Your store in about a minute.</p>
+          </header>
+        )}
         {noStorage && (
           <p className="flex gap-2 rounded-xl bg-warn-bg p-3 text-sm text-warn-ink">
             <IconAlert size={18} className="shrink-0" />
@@ -398,9 +460,25 @@ export default function CreateForm() {
       {/* Sticky CTA: stays reachable above the keyboard at 360 px (viewport uses interactive-widget=resizes-content). */}
       <div className="sticky bottom-0 z-10 bg-gradient-to-t from-paper via-paper/95 to-paper/0 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4">
         <button type="submit" disabled={!valid || busy} className={btnClass("primary", "lg", "w-full")}>
-          {busy ? "Creating…" : "Create my store"}
+          {editToken ? (busy ? "Starting…" : "Regenerate my store") : busy ? "Creating…" : "Create my store"}
         </button>
       </div>
+      {confirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-scrim/70 p-4 md:items-center" role="dialog" aria-modal aria-label="Regenerate with new answers">
+          <div className="w-full max-w-sm space-y-4 rounded-[24px] bg-surface p-5">
+            <p className="font-display text-xl font-bold">Regenerate your store?</p>
+            <p className="text-sm text-muted">This replaces your bio and all products. Your published page stays as it is until you publish again.</p>
+            <div className="flex gap-2">
+              <button type="button" className={btnClass("secondary", "md", "flex-1")} onClick={() => setConfirmOpen(false)}>
+                Cancel
+              </button>
+              <button type="button" className={btnClass("primary", "md", "flex-1")} onClick={regenerateWithNewAnswers}>
+                Regenerate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 }

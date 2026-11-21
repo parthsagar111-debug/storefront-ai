@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { StoreView } from "@/components/store-view";
 import { Button, StatusBadge, Logo, btnClass } from "@/components/ui";
@@ -209,10 +210,20 @@ export default function StoreEditor({
             <StatusBadge kind={badge} />
           </div>
           {publishedAt && (
-            <a href={`/s/${slug}`} target="_blank" rel="noopener noreferrer" className={btnClass("secondary", "sm", "md:border-0 md:bg-transparent")}>
-              View live <IconArrowUpRight size={16} />
+            <a
+              href={`/s/${slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="View live"
+              className={btnClass("secondary", "sm", "min-w-11 px-0 sm:px-3 md:border-0 md:bg-transparent")}
+            >
+              <span className="hidden sm:inline">View live</span> <IconArrowUpRight size={16} />
             </a>
           )}
+          {/* T28: new answers for the same store/token → confirm → regenerate (S1 in edit mode). */}
+          <Link href={`/?edit=${encodeURIComponent(token)}`} className={btnClass("secondary", "sm", "shrink-0 whitespace-nowrap")}>
+            Edit answers
+          </Link>
           <div className="hidden gap-2 md:flex">
             <Button variant="secondary" size="sm" disabled={anyBusy} onClick={() => setConfirmAll(true)}>
               <IconRefresh size={16} />
