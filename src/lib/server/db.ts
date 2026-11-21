@@ -29,6 +29,7 @@ export interface StoreRow {
   published: import("@/lib/ai/schemas").TStoreContent | null;
   published_at: string | null;
   has_unpublished_changes: boolean;
+  draft_rev: number;
   gen_started_at: string | null;
   gen_attempts: number;
   model_used: string | null;

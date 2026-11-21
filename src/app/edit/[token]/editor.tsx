@@ -153,6 +153,7 @@ export default function Editor({ params }: { params: Promise<{ token: string }> 
         draft={s.draft}
         publishedAt={s.publishedAt}
         hasUnpublishedChanges={s.hasUnpublishedChanges}
+        draftRev={s.draftRev}
         counts={s.counts}
       />
     );

@@ -22,6 +22,7 @@ export function editorView(s: StoreRow) {
     followUp: s.follow_up,
     input: s.input,
     draft: s.draft,
+    draftRev: s.draft_rev ?? 0,
     publishedAt: s.published_at,
     hasUnpublishedChanges: s.has_unpublished_changes,
     genStartedAt: s.gen_started_at,

@@ -61,7 +61,7 @@ export async function runGeneration(storeId: string, preClaimed?: StoreRow): Pro
 
   const { value, model, attempts, latencyMs } = out.result;
   if (value.kind === "ok") {
-    await finish({ status: "ready", draft: value.content, follow_up: null, model_used: model });
+    await finish({ status: "ready", draft: value.content, draft_rev: (store.draft_rev ?? 0) + 1, follow_up: null, model_used: model });
     await logEvent(storeId, "generation_completed", { model, attempts, latencyMs });
   } else {
     const prevRound = store.follow_up?.kind === "needs_more" ? store.follow_up.round : 0;

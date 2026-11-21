@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { db, logEvent } from "@/lib/server/db";
+import { logEvent } from "@/lib/server/db";
 import { storeForToken, editorView, notFound } from "@/lib/server/store-access";
 import { validateDraft, storeCounts } from "@/lib/server/rules";
-import { Format } from "@/lib/ai/schemas";
+import { Format, type TStoreContent } from "@/lib/ai/schemas";
+import { writeDraft, conflict } from "@/lib/server/draft-write";
 import { priceFor } from "@/lib/pricing";
 import { normalizeIndianMobile } from "@/lib/whatsapp";
 import { normalizeInstagram, HANDLE_RE } from "@/lib/instagram";
@@ -40,12 +41,17 @@ const ProductPatch = z.object({
 });
 
 const Body = z.object({
+  draftRev: z.number().int().min(0).optional(),
   creator: CreatorPatch.optional(),
   product: ProductPatch.optional(),
   theme: z.enum(["saffron", "teal", "plum", "indigo"]).optional(),
 });
 
-/** Manual edits (SPEC §9 PATCH): merged into the draft, then the whole draft is re-validated incl. T5. */
+/**
+ * Manual edits (SPEC §9 PATCH). IQA-01/QA-08: the client sends only the fields it changed plus the
+ * draftRev it loaded; the server merges them into the LATEST draft (writeDraft re-reads and re-applies
+ * once on a lost race), then re-validates the whole draft incl. T5.
+ */
 export async function PATCH(req: Request, ctx: RouteContext<"/api/stores/[token]">) {
   const { token } = await ctx.params;
   const store = await storeForToken(token);
@@ -57,50 +63,49 @@ export async function PATCH(req: Request, ctx: RouteContext<"/api/stores/[token]
     const i = body.error.issues[0];
     return Response.json({ error: "invalid", field: i.path.slice(1).join(".") || i.path.join(".") }, { status: 400 });
   }
-  const draft = structuredClone(store.draft);
-  const { creator, product, theme } = body.data;
+  const { creator, product, theme, draftRev } = body.data;
 
-  if (creator) {
-    const { whatsapp, instagramHandle, ...rest } = creator;
-    Object.assign(draft.creator, rest);
-    if (instagramHandle !== undefined) draft.creator.instagramHandle = instagramHandle || undefined;
-    if (whatsapp !== undefined) {
-      if (whatsapp === "") draft.creator.whatsapp = undefined;
-      else {
-        const n = normalizeIndianMobile(whatsapp);
-        if (!n) return Response.json({ error: "invalid_whatsapp", field: "whatsapp" }, { status: 400 });
-        draft.creator.whatsapp = n;
+  const merge = (draft: TStoreContent): TStoreContent | Response => {
+    if (creator) {
+      const { whatsapp, instagramHandle, ...rest } = creator;
+      Object.assign(draft.creator, rest);
+      if (instagramHandle !== undefined) draft.creator.instagramHandle = instagramHandle || undefined;
+      if (whatsapp !== undefined) {
+        if (whatsapp === "") draft.creator.whatsapp = undefined;
+        else {
+          const n = normalizeIndianMobile(whatsapp);
+          if (!n) return Response.json({ error: "invalid_whatsapp", field: "whatsapp" }, { status: 400 });
+          draft.creator.whatsapp = n;
+        }
       }
     }
-  }
-  if (product) {
-    const p = draft.products.find((x) => x.id === product.id);
-    if (!p) return Response.json({ error: "unknown_product" }, { status: 404 });
-    const { id: _id, ...fields } = product;
-    void _id;
-    const formatChanged = Boolean(fields.format && fields.format !== p.format);
-    Object.assign(p, fields);
-    // New format at its typical table price → tier "typical" (S3: changing format re-prices to its typical tier).
-    if (formatChanged && p.price === priceFor(p.format, "typical")) p.tier = "typical";
-    // Price source: the table price for (format, tier) counts as AI; anything else is the creator's (D17).
-    if (fields.format || fields.price !== undefined) {
-      if (fields.format && fields.price === undefined) {
-        p.tier = "typical";
-        p.price = priceFor(p.format, "typical");
+    if (product) {
+      const p = draft.products.find((x) => x.id === product.id);
+      // The product was regenerated/replaced in another tab: don't write into a product that no longer exists.
+      if (!p) return conflict();
+      const { id: _id, ...fields } = product;
+      void _id;
+      const formatChanged = Boolean(fields.format && fields.format !== p.format);
+      Object.assign(p, fields);
+      // New format at its typical table price → tier "typical" (S3: changing format re-prices to its typical tier).
+      if (formatChanged && p.price === priceFor(p.format, "typical")) p.tier = "typical";
+      // Price source: the table price for (format, tier) counts as AI; anything else is the creator's (D17).
+      if (fields.format || fields.price !== undefined) {
+        if (fields.format && fields.price === undefined) {
+          p.tier = "typical";
+          p.price = priceFor(p.format, "typical");
+        }
+        p.priceSource = p.price === priceFor(p.format, p.tier) ? "ai_tier" : "creator";
       }
-      p.priceSource = p.price === priceFor(p.format, p.tier) ? "ai_tier" : "creator";
     }
-  }
-  if (theme) draft.theme = theme;
+    if (theme) draft.theme = theme;
+    const v = validateDraft(draft);
+    if (!v.ok) return Response.json(v.err, { status: 400 });
+    return v.draft;
+  };
 
-  const v = validateDraft(draft);
-  if (!v.ok) return Response.json(v.err, { status: 400 });
-
-  const { error } = await db()
-    .from("stores")
-    .update({ draft: v.draft, has_unpublished_changes: Boolean(store.published) })
-    .eq("id", store.id);
-  if (error) return Response.json({ error: "server_error" }, { status: 500 });
+  const w = await writeDraft(store, draftRev ?? store.draft_rev ?? 0, merge);
+  if (!w.ok) return w.response;
   await logEvent(store.id, "section_edited", { section: product ? "product" : creator ? "header" : "theme" });
-  return Response.json({ draft: v.draft, hasUnpublishedChanges: Boolean(store.published) });
+  return Response.json({ draft: w.draft, draftRev: w.draftRev, hasUnpublishedChanges: Boolean(w.row.published) });
 }

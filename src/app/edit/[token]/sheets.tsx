@@ -10,6 +10,7 @@ import { normalizeIndianMobile } from "@/lib/whatsapp";
 
 export type PatchFn = (body: unknown) => Promise<{ ok: true } | { ok: false; field?: string; error?: string }>;
 
+const CONFLICT_MSG = "This store changed in another tab. Refresh to see the latest.";
 const PRIVACY = "This number will be visible to anyone who opens your store.";
 
 const FIELD_MSG: Record<string, string> = {
@@ -67,13 +68,14 @@ function PhoneInput({ id, value, onChange, bad, autoFocus }: { id: string; value
 
 export function HeaderSheet({ draft, onClose, patch }: { draft: TStoreContent; onClose: () => void; patch: PatchFn }) {
   const c = draft.creator;
-  const [v, setV] = useState({
+  const [initial] = useState(() => ({
     displayName: c.displayName,
     headline: c.headline,
     bio: c.bio,
     instagramHandle: c.instagramHandle ?? "",
     whatsapp: c.whatsapp ?? "",
-  });
+  }));
+  const [v, setV] = useState(initial);
   const [bad, setBad] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const needsWa = draft.products.some((p) => p.availability === "available");
@@ -81,11 +83,14 @@ export function HeaderSheet({ draft, onClose, patch }: { draft: TStoreContent; o
   const save = async () => {
     if (v.whatsapp && !normalizeIndianMobile(v.whatsapp)) return setBad("whatsapp");
     if (!v.whatsapp && needsWa) return setBad("whatsapp");
+    // IQA-01/QA-08: send only the fields this sheet changed, so another tab's edits to other fields survive.
+    const changed = Object.fromEntries(Object.entries(v).filter(([k, x]) => x !== initial[k as keyof typeof initial]));
+    if (Object.keys(changed).length === 0) return onClose();
     setBusy(true);
-    const r = await patch({ creator: v });
+    const r = await patch({ creator: changed });
     setBusy(false);
     if (r.ok) onClose();
-    else setBad(r.field?.replace(/^creator\./, "") || "form");
+    else setBad(r.error === "changed_elsewhere" ? "conflict" : r.field?.replace(/^creator\./, "") || "form");
   };
   const set = (k: keyof typeof v) => (e: { target: { value: string } }) => {
     setV({ ...v, [k]: e.target.value });
@@ -130,6 +135,7 @@ export function HeaderSheet({ draft, onClose, patch }: { draft: TStoreContent; o
         />
       </Field>
       {bad === "form" && <p className="text-sm text-danger">Couldn&apos;t save. Please check the fields.</p>}
+      {bad === "conflict" && <p className="text-sm font-semibold text-danger">{CONFLICT_MSG}</p>}
     </Sheet>
   );
 }
@@ -147,7 +153,7 @@ export function ProductSheet({
   onClose: () => void;
   patch: PatchFn;
 }) {
-  const [v, setV] = useState({
+  const [initial] = useState(() => ({
     availability: product.availability,
     title: product.title,
     format: product.format,
@@ -155,7 +161,8 @@ export function ProductSheet({
     summary: product.summary,
     description: product.description,
     whatYouGet: [...product.whatYouGet],
-  });
+  }));
+  const [v, setV] = useState(initial);
   const [whatsapp, setWhatsapp] = useState(draft.creator.whatsapp ?? "");
   const [bad, setBad] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -179,10 +186,24 @@ export function ProductSheet({
         return setBad("whatsapp");
       }
     }
-    const r = await patch({ product: { id: product.id, ...v, price } });
+    // IQA-01/QA-08: only the fields this sheet changed.
+    const changed: Record<string, unknown> = {};
+    for (const k of Object.keys(v) as (keyof typeof v)[]) {
+      if (JSON.stringify(v[k]) !== JSON.stringify(initial[k])) changed[k] = k === "price" ? price : v[k];
+    }
+    if (Object.keys(changed).length === 0) {
+      setBusy(false);
+      return onClose();
+    }
+    const r = await patch({ product: { id: product.id, ...changed } });
     setBusy(false);
     if (r.ok) onClose();
-    else setBad(r.field?.replace(/^products\.\d+\./, "").replace(/^product\./, "").replace(/\.\d+$/, "") || "form");
+    else
+      setBad(
+        r.error === "changed_elsewhere"
+          ? "conflict"
+          : r.field?.replace(/^products\.\d+\./, "").replace(/^product\./, "").replace(/\.\d+$/, "") || "form",
+      );
   };
   const set = (k: "title" | "summary" | "description" | "price") => (e: { target: { value: string } }) => {
     setV({ ...v, [k]: e.target.value });
@@ -280,6 +301,7 @@ export function ProductSheet({
         </div>
       </Field>
       {bad === "form" && <p className="text-sm text-danger">Couldn&apos;t save. Please check the fields.</p>}
+      {bad === "conflict" && <p className="text-sm font-semibold text-danger">{CONFLICT_MSG}</p>}
     </Sheet>
   );
 }
@@ -296,7 +318,7 @@ export function PublishSheet({
   token: string;
   slug: string;
   onClose: () => void;
-  onPublished: (draft: TStoreContent, publishedAt: string) => void;
+  onPublished: (draft: TStoreContent, publishedAt: string, draftRev?: number) => void;
 }) {
   const [step, setStep] = useState<"ask" | "live">(draft.creator.whatsapp ? "live" : "ask");
   const [url, setUrl] = useState<string | null>(null);
@@ -326,7 +348,7 @@ export function PublishSheet({
     }
     setUrl(body.url);
     setStep("live");
-    onPublished(body.draft, body.publishedAt);
+    onPublished(body.draft, body.publishedAt, body.draftRev);
   };
 
   // Number already on file → publish immediately (once).

@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { db, logEvent } from "@/lib/server/db";
+import { logEvent } from "@/lib/server/db";
+import { writeDraft, conflict, type DraftApply } from "@/lib/server/draft-write";
 import { storeForToken, notFound } from "@/lib/server/store-access";
 import { generationLimited, tooMany } from "@/lib/server/rules";
 import { toCreatorInput } from "@/lib/server/input";
@@ -44,13 +45,14 @@ export async function POST(req: Request, ctx: RouteContext<"/api/stores/[token]/
   if (await generationLimited(store.id)) return tooMany(); // T19 shared limit
   await logEvent(store.id, "section_regenerated", { target: body.data.target });
 
+  // The AI sees (and validates against) the draft as it was when the request started…
   const draft = store.draft;
   const input = store.input;
   const ci = toCreatorInput(input);
   const system = systemPrompt(input.language);
   const current = storeForPrompt(draft);
-  let next: TStoreContent;
-  let message: string | undefined;
+  // …and after it returns, IQA-01: re-read the LATEST draft and replace only the target (bio / that one product / all).
+  let apply: DraftApply;
 
   if (body.data.target === "bio") {
     const out = await runWithFallback({
@@ -66,7 +68,8 @@ export async function POST(req: Request, ctx: RouteContext<"/api/stores/[token]/
       },
     });
     if (!out.ok) return Response.json({ error: "ai_failed" }, { status: 502 });
-    next = { ...draft, creator: { ...draft.creator, ...out.result.value } };
+    const bio = out.result.value;
+    apply = (latest) => ({ ...latest, creator: { ...latest.creator, headline: bio.headline, bio: bio.bio } });
   } else if (body.data.target === "product") {
     const productId = body.data.productId;
     const target = draft.products.find((p) => p.id === productId);
@@ -82,11 +85,21 @@ export async function POST(req: Request, ctx: RouteContext<"/api/stores/[token]/
       accept: (raw) => {
         const r = ProductResult.safeParse(raw);
         if (!r.success) throw new CheckFailed("zod: " + r.error.message.slice(0, 300));
-        return acceptProduct(r.data.product, input, draft, productId);
+        acceptProduct(r.data.product, input, draft, productId); // checks → fallback model on failure
+        return r.data.product;
       },
     });
     if (!out.ok) return Response.json({ error: "ai_failed" }, { status: 502 });
-    next = { ...draft, products: out.result.value };
+    const modelProduct = out.result.value;
+    apply = (latest) => {
+      // Edited in another tab meanwhile: keep those edits, swap only this product (same slot, new id — T20).
+      if (!latest.products.some((p) => p.id === productId)) return conflict();
+      try {
+        return { ...latest, products: acceptProduct(modelProduct, input, latest, productId) };
+      } catch {
+        return conflict(); // e.g. another tab changed a format so the new one now collides
+      }
+    };
   } else {
     // Regenerate all reuses the full generation pipeline; needs_more / unclear keep the draft (T25).
     const out = await runWithFallback({
@@ -97,23 +110,20 @@ export async function POST(req: Request, ctx: RouteContext<"/api/stores/[token]/
       schema: GenerationResultUnionSchema,
       accept: (raw) => {
         const r = parseGeneration(raw);
-        if (r.status === "ok") return { content: buildStoreContent(r, input, draft) };
+        if (r.status === "ok") {
+          buildStoreContent(r, input, draft); // checks → fallback model on failure
+          return { ok: r };
+        }
         return { message: r.status === "needs_more" ? r.question : r.reason };
       },
     });
     if (!out.ok) return Response.json({ error: "ai_failed" }, { status: 502 });
-    if ("message" in out.result.value) {
-      message = out.result.value.message;
-      return Response.json({ draft, kept: true, message });
-    }
-    next = out.result.value.content;
+    const v = out.result.value;
+    if ("message" in v) return Response.json({ draft, draftRev: store.draft_rev, kept: true, message: v.message });
+    apply = (latest) => buildStoreContent(v.ok, input, latest); // keeps the latest name / Instagram / WhatsApp / theme
   }
 
-  const { error } = await db()
-    .from("stores")
-    .update({ draft: next, has_unpublished_changes: Boolean(store.published) })
-    .eq("id", store.id)
-    .eq("status", "ready");
-  if (error) return Response.json({ error: "server_error" }, { status: 500 });
-  return Response.json({ draft: next, hasUnpublishedChanges: Boolean(store.published) });
+  const w = await writeDraft(store, store.draft_rev ?? 0, apply);
+  if (!w.ok) return w.response;
+  return Response.json({ draft: w.draft, draftRev: w.draftRev, hasUnpublishedChanges: Boolean(w.row.published) });
 }

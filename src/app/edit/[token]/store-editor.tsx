@@ -14,12 +14,18 @@ export interface Counts {
 
 type Busy = { header?: boolean; productId?: string | null; all?: boolean };
 
+const CHANGED_ELSEWHERE = "This store changed in another tab. Refresh to see the latest.";
+
+/** IQA-01: the draft revision this tab last saw, per store token. Every write sends it; responses advance it. */
+const draftRevs = new Map<string, number>();
+
 export default function StoreEditor({
   token,
   slug,
   draft: initialDraft,
   publishedAt: initialPublishedAt,
   hasUnpublishedChanges: initialDirty,
+  draftRev: initialRev,
   counts,
 }: {
   token: string;
@@ -27,6 +33,7 @@ export default function StoreEditor({
   draft: TStoreContent;
   publishedAt: string | null;
   hasUnpublishedChanges: boolean;
+  draftRev: number;
   counts: Counts | null;
 }) {
   const [draft, setDraft] = useState(initialDraft);
@@ -38,6 +45,11 @@ export default function StoreEditor({
   const [toast, setToast] = useState<string | null>(null);
   const [why, setWhy] = useState<string | null>(null);
   const [noteSeen, setNoteSeen] = useState(true);
+  // IQA-01: the draft revision this tab last saw; every write sends it and the server returns the next one.
+  // Seed this tab's revision for the store (read/written only in handlers and fetch callbacks).
+  useEffect(() => {
+    draftRevs.set(token, initialRev);
+  }, [token, initialRev]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -51,23 +63,31 @@ export default function StoreEditor({
     return () => clearTimeout(t);
   }, []);
 
-  const flash = (msg: string) => {
+  function flash(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(null), 3500);
-  };
+  }
 
   const api = `/api/stores/${encodeURIComponent(token)}`;
 
   const patch: PatchFn = useCallback(
     async (body) => {
-      const res = await fetch(api, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const res = await fetch(api, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...(body as object), draftRev: draftRevs.get(token) ?? initialRev }),
+      });
       const b = await res.json().catch(() => ({}));
-      if (!res.ok) return { ok: false, field: b.field, error: b.error };
+      if (!res.ok) {
+        if (res.status === 409 && b.error === "changed_elsewhere") flash(CHANGED_ELSEWHERE);
+        return { ok: false, field: b.field, error: b.error };
+      }
+      draftRevs.set(token, b.draftRev);
       setDraft(b.draft);
       setDirty(b.hasUnpublishedChanges);
       return { ok: true };
     },
-    [api],
+    [api, token, initialRev],
   );
 
   const regenerate = async (body: { target: "bio" } | { target: "product"; productId: string } | { target: "all" }) => {
@@ -76,9 +96,11 @@ export default function StoreEditor({
       const res = await fetch(`${api}/regenerate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const b = await res.json().catch(() => ({}));
       if (res.status === 429) flash("Too many regenerations for this store. Try again in a while.");
+      else if (res.status === 409 && b.error === "changed_elsewhere") flash(CHANGED_ELSEWHERE);
       else if (!res.ok) flash("Couldn't regenerate, kept your previous version.");
       else if (b.kept) flash(b.message ? `Kept your store: ${b.message}` : "Couldn't regenerate, kept your previous version.");
       else {
+        if (typeof b.draftRev === "number") draftRevs.set(token, b.draftRev);
         setDraft(b.draft);
         setDirty(b.hasUnpublishedChanges);
       }
@@ -279,7 +301,8 @@ export default function StoreEditor({
           token={token}
           slug={slug}
           onClose={() => setSheet(null)}
-          onPublished={(d, at) => {
+          onPublished={(d, at, r) => {
+            if (typeof r === "number") draftRevs.set(token, r);
             setDraft(d);
             setPublishedAt(at);
             setDirty(false);
