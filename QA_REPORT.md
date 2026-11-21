@@ -1111,3 +1111,631 @@ Changes: SPEC v4.5 / PROMPTS v3, finance "safe"-wording check, T28 Edit answers 
 ---
 
 Run finished at 2026-11-21 11:59 IST. Shutting down.
+
+## 11. Round 3 (Sun 22 Nov, production)
+
+Changes: SPEC v5 / PROMPTS v5 (V1–V7). Commits: item 1 `9fed6e5`, item 2 `870f15b`, item 3 `b912eec`, item 4 `4ad910b`, item 5 `f720bd1`, item 6 `39f76e6`, item 7 `795f38f`, item 8 `a43c094`, eval fix `af04782`. Deploys after items 1–3, 4–6 and 7–9; core gate **43/43 after each** (and again after the eval fix). New UI checks for items 6–8 (`qa/scripts/round3-ui.mjs`, real UI at 360 px) **12/12** on production; round-2 E25 / E26 (updated to the v5 labels) **pass**.
+
+**Found and fixed during this round**
+- **One-tap republish never fired (dev / strict mode):** the auto-publish effect cleared its own timer on the strict-mode re-run. Fixed before deploy (guard inside the timer).
+- **"Is it live?" check:** every page's HTML carries Next's not-found template text, so checking for "doesn't exist" could never pass. The public store now renders `data-store="<slug>"` and the publish sheet looks for that.
+- **Finance eval store failed on both models** (first run): attempt 1 was rightly rejected for *"invest your business savings safely"*; attempt 2 was rejected for *"stock tips"*, most likely written as a negation ("no stock tips"). Negated phrases in the same clause (no / not / never / without / don't …, ≤ 6 words before) are now allowed; un-negated phrases and "safe"-type wording still fail (unit tests both ways). Re-run: ok on the first attempt.
+
+### Mini eval (4 generations + 1 re-run, production, free tier)
+
+| Store | Attempts | Products designed for the audience | learn → apply → guided | Bio (Instagram-like?) | tierReasons mention the buyer / no raw "No audience yet" | Word targets | v5 prices |
+|---|---|---|---|---|---|---|---|
+| Cooking / Hinglish — Ananya, working professionals, 5K–20K | primary 503 → fallback ok | ✅ ✅ ✅ (20-min weeknight recipes, 20-min kitchen workflow live, kitchen-routine 1:1) | ✅ recipes → live workflow → 1:1 | Mostly: "Main Ananya hoon. Office ki thakan ke baad bhi aap healthy aur ghar ka bana khana enjoy kar sakte hain. Mere saath seekhein…" (gender-neutral) | ❌ 0/3 name the buyer ("followers", "the audience", "the creator's audience size" — the last one is literal/awkward) · ✅ no raw label | ✅ all met, nothing trimmed | ✅ 149 / 399 / 1,499 |
+| Finance — small business owners, English, under 5K, no result given | run 1: both failed (see above); run 2: 1 attempt ok | ✅ ✅ ✅ (separate business vs personal cash flow; SIPs from irregular earnings; business + personal budget live) | ⚠️ partly: tool (apply) → guide (learn) → live (guided) | So-so: "I help small business owners manage their money and learn investing basics…" (plain, closer to LinkedIn) | ✅ 3/3 (busy business owners, self-employed, owners); "small, early audience" in natural words | ✅ all met | ✅ 199 / 299 / 799 |
+| Career coach — freshers, English, no audience yet, no result given | 1 attempt ok | ✅ ✅ ✅ (fresher resume templates, mock interview 1:1, interview masterclass) | ⚠️ price order puts the 1:1 before the course: template → 1:1 → recorded course | So-so: "I help college graduates prepare for interviews and build strong resumes. Let us get your career started step by step." | ✅ 3/3 mention freshers / job seekers · ❌ 1 reason opens "**With no audience yet**, …" (raw label quoted) | ✅ met; 1 summary trimmed by the 15% rule ("…recent…") | ✅ 199 / 699 / 1,499 |
+| UPSC — first-time aspirants, English, 100K+ | 1 attempt ok | ✅ ✅ ✅ ✅ (answer-writing guide, self-evaluation checklists, live answer workshop, 1:1 answer review) | ✅ guide → checklists / live → 1:1 review; step-up above entry (1:1 high ₹1,499) | Yes-ish: "…No heavy jargon, just clear steps to improve your daily writing." | ✅ 4/4 (aspirants / students; "large following" in natural words) | ✅ all met | ✅ 149 / 399 / 399 / 1,499 |
+
+All rule checks pass on every stored draft (B7 + backstory + finance + "safe"). No "safe"-type finance wording in the final finance store; it includes a "Sample asset allocation plan" PDF — educational, but worth a look.
+
+**Takeaways for Parth:** audience fit and prices are solid; tierReasons are good when the primary model answers and weak on the fallback (cooking); the raw "No audience yet" quote still appears (1 of 13 reasons) despite PROMPTS v5 — a code-side rewrite or check is possible if you want it; bios are clean but often plain rather than Instagram-like.
+
+### Full JSON (stored drafts, no tokens)
+
+<details><summary>Cooking / Hinglish — Ananya</summary>
+
+```json
+{
+  "slug": "qa-ananya-sharma-0g37",
+  "violations": [],
+  "words": {
+    "headline": [
+      9,
+      true
+    ],
+    "bio": [
+      32,
+      true
+    ],
+    "products": [
+      {
+        "title": [
+          4,
+          true
+        ],
+        "summary": [
+          13,
+          true
+        ],
+        "description": [
+          24,
+          true
+        ],
+        "trimmed": false
+      },
+      {
+        "title": [
+          5,
+          true
+        ],
+        "summary": [
+          12,
+          true
+        ],
+        "description": [
+          24,
+          true
+        ],
+        "trimmed": false
+      },
+      {
+        "title": [
+          5,
+          true
+        ],
+        "summary": [
+          11,
+          true
+        ],
+        "description": [
+          26,
+          true
+        ],
+        "trimmed": false
+      }
+    ]
+  },
+  "pricesMatchV5": true,
+  "rawNoAudienceLabel": 0,
+  "draft": {
+    "theme": "saffron",
+    "creator": {
+      "bio": "Main Ananya hoon. Office ki thakan ke baad bhi aap healthy aur ghar ka bana khana enjoy kar sakte hain. Mere saath seekhein kaise kam waqt mein kitchen ka kaam khatam karein.",
+      "headline": "Office ke baad, sirf 20 minute mein tasty khana",
+      "displayName": "QA Ananya Sharma"
+    },
+    "language": "hinglish",
+    "products": [
+      {
+        "id": "rkcWt2z2",
+        "tier": "low",
+        "price": 149,
+        "title": "20-Minute Weeknight Recipe Collection",
+        "format": "ebook",
+        "summary": "15 quick recipes that take less than 20 minutes from start to finish.",
+        "tierReason": "A low price point is perfect for followers to quickly start cooking faster without a huge commitment.",
+        "whatYouGet": [
+          "PDF with 15 quick recipes",
+          "Weekly meal prep checklist",
+          "List of 10 essential pantry staples"
+        ],
+        "description": "Busy office days don't mean ordering out. This collection helps you whip up healthy meals in minutes so you have more time to relax.",
+        "priceSource": "ai_tier",
+        "availability": "coming_soon"
+      },
+      {
+        "id": "yTdrhmoI",
+        "tier": "typical",
+        "price": 399,
+        "title": "Master the 20-Minute Kitchen Workflow",
+        "format": "live_workshop",
+        "summary": "Learn my exact method to cook daily meals in under 20 minutes.",
+        "tierReason": "A live workshop offers better value for the audience to learn techniques directly and ask questions in real-time.",
+        "whatYouGet": [
+          "90-minute live demonstration on Zoom",
+          "Recording of the live session",
+          "Kitchen workflow worksheet"
+        ],
+        "description": "Stop spending hours in the kitchen after a long workday. Join this live session to see my prep hacks and cooking flow in action.",
+        "priceSource": "ai_tier",
+        "availability": "coming_soon"
+      },
+      {
+        "id": "zBuNIf8x",
+        "tier": "high",
+        "price": 1499,
+        "title": "Kitchen Efficiency Audit & Plan",
+        "format": "one_on_one",
+        "summary": "A private session to redesign your kitchen routine for maximum speed.",
+        "tierReason": "Personalized attention for the creator's audience size allows for a premium tier that addresses individual kitchen challenges.",
+        "whatYouGet": [
+          "45-minute 1:1 video consultation",
+          "Customised weekly meal template",
+          "Personalised kitchen organization tips"
+        ],
+        "description": "We will look at your current cooking habits and customize a plan that fits your kitchen setup and food preferences. Get personal help to save time.",
+        "priceSource": "ai_tier",
+        "availability": "coming_soon"
+      }
+    ],
+    "sensitiveDomain": "none"
+  },
+  "attempts": [
+    {
+      "ms": 2398,
+      "ok": false,
+      "error": "{\"error\":{\"code\":503,\"message\":\"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.\",\"status\":\"UNAVAILABLE\"}}",
+      "model": "gemini-3.5-flash-lite"
+    },
+    {
+      "ms": 3571,
+      "ok": true,
+      "model": "gemini-3.1-flash-lite"
+    }
+  ]
+}
+```
+</details>
+<details><summary>Finance — small business owners (run 2, after the fix)</summary>
+
+```json
+{
+  "slug": "qa-meera-iyer-u4gi",
+  "violations": [],
+  "words": {
+    "headline": [
+      9,
+      true
+    ],
+    "bio": [
+      25,
+      true
+    ],
+    "products": [
+      {
+        "title": [
+          4,
+          true
+        ],
+        "summary": [
+          10,
+          true
+        ],
+        "description": [
+          23,
+          true
+        ],
+        "trimmed": false
+      },
+      {
+        "title": [
+          4,
+          true
+        ],
+        "summary": [
+          12,
+          true
+        ],
+        "description": [
+          25,
+          true
+        ],
+        "trimmed": false
+      },
+      {
+        "title": [
+          4,
+          true
+        ],
+        "summary": [
+          11,
+          true
+        ],
+        "description": [
+          25,
+          true
+        ],
+        "trimmed": false
+      }
+    ]
+  },
+  "pricesMatchV5": true,
+  "rawNoAudienceLabel": 0,
+  "draft": {
+    "theme": "indigo",
+    "creator": {
+      "bio": "I help small business owners manage their money and learn investing basics. Get practical guides and tools to keep your business and personal funds separate.",
+      "headline": "Personal finance and investing basics for small business owners",
+      "displayName": "QA Meera Iyer"
+    },
+    "language": "en",
+    "products": [
+      {
+        "id": "HMsKqbwc",
+        "tier": "low",
+        "price": 199,
+        "title": "Business Money Tracking Sheet",
+        "format": "template_pack",
+        "summary": "A ready-to-use tracker to separate business and personal cash flow.",
+        "disclaimer": "For learning only. Not investment advice.",
+        "tierReason": "With a small, early audience, a low entry price makes it simple for busy business owners to try your tools without thinking twice.",
+        "whatYouGet": [
+          "Excel and Google Sheets income tracker",
+          "Expense category setup guide",
+          "Monthly cash flow summary view"
+        ],
+        "description": "Stop mixing your daily business revenue with household expenses. This tracker helps you see exactly what your shop or agency earns each month.",
+        "priceSource": "ai_tier",
+        "availability": "coming_soon"
+      },
+      {
+        "id": "DKpY8U-v",
+        "tier": "typical",
+        "price": 299,
+        "title": "Simple Investing Basics Guide",
+        "format": "ebook",
+        "summary": "A complete PDF guide to starting your first mutual funds and SIPs.",
+        "disclaimer": "For learning only. Not investment advice.",
+        "tierReason": "This thorough guide gives self-employed professionals a clear, step-by-step roadmap to start investing from irregular earnings.",
+        "whatYouGet": [
+          "PDF guide on mutual fund basics",
+          "Checklist for setting up SIPs",
+          "Sample asset allocation plan"
+        ],
+        "description": "Designed for entrepreneurs who do not have a fixed monthly salary. Learn how to build a sensible portfolio step by step without complicated financial jargon.",
+        "priceSource": "ai_tier",
+        "availability": "coming_soon"
+      },
+      {
+        "id": "34gG6KID",
+        "tier": "high",
+        "price": 799,
+        "title": "Money Setup Live Workshop",
+        "format": "live_workshop",
+        "summary": "A live 90-minute masterclass on fixing your business and personal budgets.",
+        "disclaimer": "For learning only. Not investment advice.",
+        "tierReason": "This live session includes direct interaction and Q and A time, offering deep guidance for owners who want live answers.",
+        "whatYouGet": [
+          "90-minute live workshop on Zoom",
+          "Recording of the entire session",
+          "Live Q and A slot for your questions"
+        ],
+        "description": "Join this interactive Zoom session to map out your business finances for the year. Bring your questions and get direct clarity on your money routines.",
+        "priceSource": "ai_tier",
+        "availability": "coming_soon"
+      }
+    ],
+    "sensitiveDomain": "finance"
+  },
+  "attempts": [
+    {
+      "ms": 2598,
+      "ok": true,
+      "model": "gemini-3.5-flash-lite"
+    }
+  ]
+}
+```
+</details>
+<details><summary>Finance — run 1 (failed on both models)</summary>
+
+```json
+{
+  "slug": "qa-meera-iyer-9e0k",
+  "status": "failed",
+  "followUp": null
+}
+```
+</details>
+<details><summary>Career coach — no audience yet</summary>
+
+```json
+{
+  "slug": "qa-rahul-nair-0vk8",
+  "violations": [],
+  "words": {
+    "headline": [
+      8,
+      true
+    ],
+    "bio": [
+      20,
+      true
+    ],
+    "products": [
+      {
+        "title": [
+          4,
+          true
+        ],
+        "summary": [
+          10,
+          true
+        ],
+        "description": [
+          21,
+          true
+        ],
+        "trimmed": true
+      },
+      {
+        "title": [
+          4,
+          true
+        ],
+        "summary": [
+          11,
+          true
+        ],
+        "description": [
+          22,
+          true
+        ],
+        "trimmed": false
+      },
+      {
+        "title": [
+          4,
+          true
+        ],
+        "summary": [
+          12,
+          true
+        ],
+        "description": [
+          23,
+          true
+        ],
+        "trimmed": false
+      }
+    ]
+  },
+  "pricesMatchV5": true,
+  "rawNoAudienceLabel": 1,
+  "draft": {
+    "theme": "indigo",
+    "creator": {
+      "bio": "I help college graduates prepare for interviews and build strong resumes. Let us get your career started step by step.",
+      "headline": "Helping freshers land their first job with confidence",
+      "displayName": "QA Rahul Nair"
+    },
+    "language": "en",
+    "products": [
+      {
+        "id": "YtvHBV8_",
+        "tier": "low",
+        "price": 199,
+        "title": "Fresher Resume Writing Template",
+        "format": "template_pack",
+        "summary": "Ready-to-use resume formats designed specifically for college freshers and recent…",
+        "tierReason": "With no audience yet, a small entry-level template pack makes it easy for freshers to make a first purchase and build a strong CV.",
+        "whatYouGet": [
+          "Two ATS-friendly resume templates in Word format",
+          "Checklist for formatting fresh CVs",
+          "Sample bullet points for college projects"
+        ],
+        "description": "Stop struggling with formatting and blank pages. This pack gives you clean resume templates that highlight your projects, internships and skills.",
+        "priceSource": "ai_tier",
+        "availability": "coming_soon"
+      },
+      {
+        "id": "Bn3zl3o4",
+        "tier": "typical",
+        "price": 699,
+        "title": "One-on-One Mock Interview Call",
+        "format": "one_on_one",
+        "summary": "A private 45-minute mock interview with feedback to improve your confidence.",
+        "tierReason": "A private video call gives freshers personalized feedback and practice, making it a valuable option for job seekers.",
+        "whatYouGet": [
+          "Forty-five minute live video call on Zoom",
+          "Personalised feedback report on your answers",
+          "List of areas to improve before your actual interview"
+        ],
+        "description": "Practice a real interview session with guidance tailored to your target role. Get actionable feedback on your answers, tone, and body language.",
+        "priceSource": "ai_tier",
+        "availability": "coming_soon"
+      },
+      {
+        "id": "FpltkoIi",
+        "tier": "typical",
+        "price": 1499,
+        "title": "First Job Interview Masterclass",
+        "format": "recorded_course",
+        "summary": "Step-by-step video lessons to prepare for job interviews and answer tricky questions.",
+        "tierReason": "This self-paced video course offers depth and clear guidance on common HR and technical interview questions for freshers.",
+        "whatYouGet": [
+          "Six self-paced video modules",
+          "PDF workbook with interview question answers",
+          "Checklist for interview day preparation"
+        ],
+        "description": "Learn how to introduce yourself, answer common HR questions, and handle salary discussions. Watch at your own pace before your next big interview.",
+        "priceSource": "ai_tier",
+        "availability": "coming_soon"
+      }
+    ],
+    "sensitiveDomain": "none"
+  },
+  "attempts": [
+    {
+      "ms": 2697,
+      "ok": true,
+      "model": "gemini-3.5-flash-lite"
+    }
+  ]
+}
+```
+</details>
+<details><summary>UPSC — 100K+</summary>
+
+```json
+{
+  "slug": "qa-rohan-verma-ufaq",
+  "violations": [],
+  "words": {
+    "headline": [
+      8,
+      true
+    ],
+    "bio": [
+      24,
+      true
+    ],
+    "products": [
+      {
+        "title": [
+          5,
+          true
+        ],
+        "summary": [
+          11,
+          true
+        ],
+        "description": [
+          27,
+          true
+        ],
+        "trimmed": false
+      },
+      {
+        "title": [
+          5,
+          true
+        ],
+        "summary": [
+          13,
+          true
+        ],
+        "description": [
+          26,
+          true
+        ],
+        "trimmed": false
+      },
+      {
+        "title": [
+          5,
+          true
+        ],
+        "summary": [
+          14,
+          true
+        ],
+        "description": [
+          31,
+          true
+        ],
+        "trimmed": false
+      },
+      {
+        "title": [
+          5,
+          true
+        ],
+        "summary": [
+          13,
+          true
+        ],
+        "description": [
+          28,
+          true
+        ],
+        "trimmed": false
+      }
+    ]
+  },
+  "pricesMatchV5": true,
+  "rawNoAudienceLabel": 0,
+  "draft": {
+    "theme": "indigo",
+    "creator": {
+      "bio": "I help first-time UPSC aspirants structure their thoughts and write high-scoring Mains answers. No heavy jargon, just clear steps to improve your daily writing.",
+      "headline": "Write better UPSC Mains answers with simple frameworks",
+      "displayName": "QA Rohan Verma"
+    },
+    "language": "en",
+    "products": [
+      {
+        "id": "NjFnG5Pf",
+        "tier": "low",
+        "price": 149,
+        "title": "UPSC Answer Writing Starter Guide",
+        "format": "ebook",
+        "summary": "Master the basics of structure and time management for Mains answers.",
+        "tierReason": "With a large following of aspirants looking for quick guidance, this small entry-level PDF makes it easy for anyone to test your method without spending much.",
+        "whatYouGet": [
+          "PDF guide with 5 answer writing frameworks",
+          "5 solved model answers for practice",
+          "Checklist for daily answer structure"
+        ],
+        "description": "Designed for first-time aspirants struggling with word limits and structure. This guide gives you a simple 5-step framework to break down any question and write structured answers.",
+        "priceSource": "ai_tier",
+        "availability": "coming_soon"
+      },
+      {
+        "id": "3EtWaQY7",
+        "tier": "typical",
+        "price": 399,
+        "title": "Mains Answer Evaluation Checklist Pack",
+        "format": "template_pack",
+        "summary": "Ready-to-use planners and evaluation sheets to track your daily essay and GS answers.",
+        "tierReason": "A comprehensive set of templates for students who want to regularly practise and self-evaluate their answers at home.",
+        "whatYouGet": [
+          "Printable daily answer writing tracker sheet",
+          "GS Paper 1 to 4 self-evaluation checklists",
+          "Time management planner for exam halls"
+        ],
+        "description": "Get practical evaluation sheets and progress trackers designed specifically for GS papers. Use them to spot your own mistakes and improve your answers every single day.",
+        "priceSource": "ai_tier",
+        "availability": "coming_soon"
+      },
+      {
+        "id": "ng5kjisH",
+        "tier": "typical",
+        "price": 399,
+        "title": "Live Mains Answer Writing Workshop",
+        "format": "live_workshop",
+        "summary": "Join a live 90-minute session to learn how to fix common answer writing mistakes.",
+        "tierReason": "A live interactive session suited for aspirants who want to watch answers being written and corrected in real time.",
+        "whatYouGet": [
+          "90-minute live session on Zoom",
+          "Live question breakdown and drafting",
+          "Recording of the live workshop"
+        ],
+        "description": "In this live Zoom session, we take real questions and write better answers together step by step. You get to clear your doubts live and see how to improve your score.",
+        "priceSource": "ai_tier",
+        "availability": "coming_soon"
+      },
+      {
+        "id": "28Wrr9Ro",
+        "tier": "high",
+        "price": 1499,
+        "title": "1-on-1 Mains Answer Review Session",
+        "format": "one_on_one",
+        "summary": "Get your written answers reviewed personally with direct feedback on your weak spots.",
+        "tierReason": "An intensive private call providing personal attention and custom feedback on the student's actual written answers.",
+        "whatYouGet": [
+          "45-minute 1-on-1 video call on Zoom",
+          "Detailed review of 3 pre-submitted answers",
+          "Personalized improvement plan for the next month"
+        ],
+        "description": "A private 45-minute video call where we sit together and review 3 of your written answers. You get direct, honest feedback on your structure, presentation, and content gaps.",
+        "priceSource": "ai_tier",
+        "availability": "coming_soon"
+      }
+    ],
+    "sensitiveDomain": "none"
+  },
+  "attempts": [
+    {
+      "ms": 3046,
+      "ok": true,
+      "model": "gemini-3.5-flash-lite"
+    }
+  ]
+}
+```
+</details>

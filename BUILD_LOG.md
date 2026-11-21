@@ -4,6 +4,27 @@ Per slice: what was built, problems hit, decisions made, how AI tools were used.
 
 ---
 
+## 🛠 Round 3 — Sun 22 Nov (BUILD_ROUND_3; SPEC v5 / PROMPTS v5; details in QA_REPORT §11)
+Tag `pre-round-3` = state before. Deploys after 1–3, 4–6, 7–9 (+ one for an eval fix); **core gate 43/43 after every deploy**; round-3 UI checks 12/12 and E25/E26 pass on production.
+
+| Item | Change | Commit | Verified |
+|---|---|---|---|
+| — | SPEC v5 + PROMPTS v5 into the repo | `02f0df0` | — |
+| 1 (V2) | PROMPTS v5 → `prompts.ts`; ≤ 15% over-limit trim at a word boundary, beyond → attempt fails | `9fed6e5` | `scripts/prompts-match.ts` 13/13 identical; unit tests |
+| 2 (V7) | §7.5 v5 price table + written-out entry-eligibility map | `870f15b` | unit tests (table, map vs ≤ ₹499, ranges, ladder); live prices on prod |
+| 3 (V2) | product regenerate validates the whole set (else keeps the old one + message); hint ≤ 120 in `<creator_hint>` | `b912eec` | unit tests; hint honoured in a live regenerate |
+| 4 (V1) | input screen: stacked sentence fields, niche-aware chips, More options, optional result end to end | `4ad910b` | local 360 px; unit tests for the optional result |
+| 5 (V3) | generating / interrupted / follow-up summary / offline / fade + one-time tip | `f720bd1` | local with seeded QA rows |
+| 6 (V4) | Undo (10 s), Remove product, regenerate hint, Start over / Edit answers, AI-only re-pricing, phone top bar + ⋯, View as buyer, price line, "Your store preview" | `39f76e6` | `round3-ui.mjs` on prod; API checks for remove / re-pricing |
+| 7 (V5) | one publish sheet, one-tap "Update live store", success only after a confirmed public load, share / Instagram / private-link-on-WhatsApp | `795f38f` | `round3-ui.mjs` on prod |
+| 8 (V6) | Available now first, "Coming soon" subheading, buy line, indicative price, WhatsApp prefill title + price in the store's language, number re-validated at render | `a43c094` | `round3-ui.mjs` on prod; unit tests |
+| — | eval fix: negated finance phrases ("no stock tips") are not advice | `af04782` | unit tests; finance re-run ok |
+| 9 | mini eval (4 gens + 1 re-run) | — | QA_REPORT §11; then production cleaned to **0 stores, 0 events** |
+
+**Decisions made (for Parth to confirm):** the 15% rule applies to tierReason too (the round-2 unlimited trim is gone: > 184 chars now fails over to the fallback model); a non-entry replacement for the only entry product is no longer silently re-tiered — the old product is kept; on phones the bottom action bar is gone (Publish is in the top bar, the rest in ⋯), and desktop also gets "View as buyer" in ⋯; result chips show only for the six known niches.
+
+---
+
 ## 🛠 Round 2 — Sat 21 Nov evening (FIX_PROMPT_2; details in QA_REPORT §10)
 One deploy round (re-deployed twice for fixes found by its own tests); **core gate 43/43** on the final build `caa90ab`; E25 + E26 pass; round-1 regression 5/5.
 
