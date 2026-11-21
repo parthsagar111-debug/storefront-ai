@@ -46,3 +46,9 @@ body {
   background-image: radial-gradient(rgba(107, 93, 80, 0.18) 1px, transparent 1px);
   background-size: 20px 20px;
 }
+
+/* V3 generating screen: indeterminate progress */
+@keyframes indeterminate {
+  0% { left: -35%; }
+  100% { left: 100%; }
+}

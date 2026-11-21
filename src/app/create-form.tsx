@@ -118,6 +118,8 @@ function CreateFormInner() {
   // T28: /?edit=<token> → same store, new answers → confirm → regenerate.
   const [editToken, setEditToken] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // A store still at the follow-up question has no draft yet: editing answers just re-runs the clarity check.
+  const [editHasDraft, setEditHasDraft] = useState(true);
 
   // S2c "unclear" → back to S1 with the previous answers prefilled (/?from=<token>).
   // T28 "Edit answers" → /?edit=<token>: prefilled, and submitting regenerates that same store.
@@ -131,7 +133,10 @@ function CreateFormInner() {
       .then((s) => {
         const i = s?.input;
         if (!i) return;
-        if (edit) setEditToken(edit);
+        if (edit) {
+          setEditToken(edit);
+          setEditHasDraft(Boolean(s.draft));
+        }
         setV({ name: i.name ?? "", expertise: i.expertise ?? "", audience: i.audience ?? "", outcome: i.outcome ?? "" });
         setSize(i.audienceSize ?? "");
         setLang(i.language ?? "en");
@@ -174,8 +179,13 @@ function CreateFormInner() {
       setTimeout(() => document.getElementById("f-insta")?.focus(), 0);
       return;
     }
+    if (!navigator.onLine) {
+      setError("You're offline. Reconnect to continue.");
+      return;
+    }
     if (editToken) {
-      setConfirmOpen(true); // T28: confirm before replacing the bio and products
+      if (editHasDraft) setConfirmOpen(true); // T28: confirm before replacing the bio and products
+      else regenerateWithNewAnswers();
       return;
     }
     setBusy(true);

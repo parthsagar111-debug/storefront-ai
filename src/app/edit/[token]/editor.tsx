@@ -17,12 +17,33 @@ const AUDIENCE_LABEL: Record<string, string> = {
   "100k_plus": "100K+",
 };
 
-const LINES = [
-  "Reading what you do…",
-  "Finding products your audience will pay for…",
-  "Pricing for Indian buyers…",
-  "Writing your page…",
-];
+/** SPEC v5 V3: one personalised status line (their audience; no follower-count pricing claim). */
+const statusLine = (audience?: string) => {
+  const a = (audience ?? "").trim();
+  if (!a) return "Finding products for your audience…";
+  // "Working professionals" → "working professionals"; keep acronyms like "UPSC aspirants".
+  const lower = /^[A-Z][a-z]/.test(a) ? a[0].toLowerCase() + a.slice(1) : a;
+  return `Finding products for ${lower}…`;
+};
+const SLOW_AFTER_MS = 12_000;
+const TIP_KEY = "sf.tip.edit.v1";
+
+/** navigator.onLine with live updates (V3: offline → "You're offline. Reconnect to continue."). */
+function useOnline() {
+  const [online, setOnline] = useState(true);
+  useEffect(() => {
+    const sync = () => setOnline(navigator.onLine);
+    sync();
+    addEventListener("online", sync);
+    addEventListener("offline", sync);
+    return () => {
+      removeEventListener("online", sync);
+      removeEventListener("offline", sync);
+    };
+  }, []);
+  return online;
+}
+const OFFLINE = "You're offline. Reconnect to continue.";
 
 type Load = { state: "loading" } | { state: "missing" } | { state: "ok"; store: EditorView & { counts: Counts | null } };
 
@@ -39,6 +60,9 @@ function EditorInner({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params);
   const [load, setLoad] = useState<Load>({ state: "loading" });
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const online = useOnline();
+  // V3: fade into the editor only when this view watched the generation finish.
+  const [sawGenerating, setSawGenerating] = useState(false);
 
   const fetchStore = useCallback(async (): Promise<Load | null> => {
     try {
@@ -74,6 +98,7 @@ function EditorInner({ params }: { params: Promise<{ token: string }> }) {
     const run = () =>
       fetchStore().then((next) => {
         if (cancelled) return;
+        if (next?.state === "ok" && (next.store.status === "pending" || next.store.status === "generating")) setSawGenerating(true);
         if (next) setLoad(next);
         else timer.current = setTimeout(run, 2000);
       });
@@ -84,22 +109,26 @@ function EditorInner({ params }: { params: Promise<{ token: string }> }) {
     };
   }, [load, active, fetchStore]);
 
-  if (load.state === "loading") return <Skeleton line={LINES[0]} />;
+  if (load.state === "loading") return <Skeleton line={online ? "Loading your store…" : OFFLINE} offline={!online} />;
   if (load.state === "missing") return <NotFoundView />;
 
   const s = load.store;
   const restart = async (path: "retry" | "answer", body?: unknown) => {
+    if (!navigator.onLine) return alert(OFFLINE); // V3: no silent retry while offline
     const res = await fetch(`/api/stores/${encodeURIComponent(token)}/${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: body ? JSON.stringify(body) : undefined,
     });
     if (res.status === 429) alert("Too many tries for this store. Please wait a bit.");
+    setSawGenerating(true);
     setLoad({ state: "ok", store: { ...s, status: "generating", isStale: false, genStartedAt: new Date().toISOString() } });
   };
 
   if (s.status === "failed" || s.isStale) {
     const i = s.input;
+    // V3: a stale/interrupted run gets its own message; a failed run keeps S2c "busy".
+    const interrupted = s.isStale && s.status !== "failed";
     return (
       <Screen>
         <div className="flex min-h-[70dvh] flex-col justify-center gap-5">
@@ -107,14 +136,16 @@ function EditorInner({ params }: { params: Promise<{ token: string }> }) {
             <IconLoader size={28} />
           </span>
           <div className="space-y-2">
-            <h1 className="font-display text-[28px] font-bold leading-tight">Our AI is busy right now.</h1>
-            <p className="text-muted">Your answers are saved.</p>
+            <h1 className="font-display text-[28px] font-bold leading-tight">
+              {interrupted ? "Generation was interrupted. Try again." : "Our AI is busy right now."}
+            </h1>
+            <p className="text-muted">{online ? "Your answers are saved." : OFFLINE}</p>
           </div>
           <p className="flex gap-2 rounded-2xl border border-line bg-surface p-4 text-sm">
             <IconCheck size={16} className="mt-0.5 shrink-0 text-teal" />
             <span>{[i.name, i.expertise, AUDIENCE_LABEL[i.audienceSize], i.language === "hinglish" ? "Hinglish" : "English"].filter(Boolean).join(" · ")}</span>
           </p>
-          <button type="button" className={btnClass("primary", "lg", "w-full")} onClick={() => restart("retry")}>
+          <button type="button" disabled={!online} className={btnClass("primary", "lg", "w-full")} onClick={() => restart("retry")}>
             <IconRefresh size={20} />
             Try again
           </button>
@@ -123,7 +154,9 @@ function EditorInner({ params }: { params: Promise<{ token: string }> }) {
     );
   }
 
-  if (s.status === "pending" || s.status === "generating") return <Generating since={s.genStartedAt ?? s.updatedAt} />;
+  if (s.status === "pending" || s.status === "generating") {
+    return <Generating since={s.genStartedAt ?? s.updatedAt} name={s.input?.name} audience={s.input?.audience} online={online} />;
+  }
 
   if (s.status === "needs_input" && s.followUp?.kind === "unclear") {
     return (
@@ -147,6 +180,8 @@ function EditorInner({ params }: { params: Promise<{ token: string }> }) {
   if (s.status === "needs_input" && s.followUp?.kind === "needs_more") {
     return (
       <PickDirection
+        token={token}
+        summary={{ teach: s.input?.expertise ?? "", to: s.input?.audience ?? "" }}
         question={s.followUp.question}
         directions={s.followUp.directions}
         allowText={s.followUp.round < 2}
@@ -157,7 +192,8 @@ function EditorInner({ params }: { params: Promise<{ token: string }> }) {
 
   if (s.status === "ready" && s.draft) {
     return (
-      <StoreEditor
+      <FadeIn enabled={sawGenerating}>
+        <StoreEditor
         token={token}
         slug={s.slug}
         draft={s.draft}
@@ -165,49 +201,91 @@ function EditorInner({ params }: { params: Promise<{ token: string }> }) {
         hasUnpublishedChanges={s.hasUnpublishedChanges}
         draftRev={s.draftRev}
         counts={s.counts}
-      />
+        />
+        <EditTip />
+      </FadeIn>
     );
   }
   return <Skeleton line="Loading…" />;
 }
 
-function Generating({ since }: { since: string }) {
-  const [i, setI] = useState(0);
+function Generating({ since, name, audience, online }: { since: string; name?: string; audience?: string; online: boolean }) {
   const [slow, setSlow] = useState(false);
   useEffect(() => {
-    const t = setInterval(() => setI((x) => Math.min(x + 1, LINES.length - 1)), 2500);
     const started = new Date(since).getTime();
-    const s = setInterval(() => setSlow(Date.now() - started > 20_000), 1000);
-    return () => {
-      clearInterval(t);
-      clearInterval(s);
-    };
+    const tick = () => setSlow(Date.now() - started > SLOW_AFTER_MS);
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
   }, [since]);
-  return <Skeleton line={slow ? "Taking a little longer than usual…" : LINES[i]} step={slow ? LINES.length - 1 : i} slow={slow} />;
+  const line = !online ? OFFLINE : slow ? "Taking a little longer…" : statusLine(audience);
+  return <Skeleton line={line} name={name} offline={!online} />;
+}
+
+/** V3: 200–300 ms fade from the generating skeleton into the editor. */
+function FadeIn({ enabled, children }: { enabled: boolean; children: ReactNode }) {
+  const [shown, setShown] = useState(!enabled);
+  useEffect(() => {
+    if (!enabled) return;
+    const r = requestAnimationFrame(() => setShown(true));
+    return () => cancelAnimationFrame(r);
+  }, [enabled]);
+  return <div className={`transition-opacity duration-[250ms] ease-out motion-reduce:transition-none ${shown ? "opacity-100" : "opacity-0"}`}>{children}</div>;
+}
+
+/** V3: one-time tip; dismissal remembered on this device (storage can be blocked → just don't remember). */
+function EditTip() {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      try {
+        setShow(localStorage.getItem(TIP_KEY) !== "1");
+      } catch {
+        setShow(true);
+      }
+    }, 0);
+    return () => clearTimeout(t);
+  }, []);
+  if (!show) return null;
+  const dismiss = () => {
+    setShow(false);
+    try {
+      localStorage.setItem(TIP_KEY, "1");
+    } catch {}
+  };
+  return (
+    <div role="status" className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-[480px] px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <div className="flex items-center gap-3 rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-paper shadow-lg">
+        <span className="flex-1">Tap Edit on anything to change it</span>
+        <button type="button" onClick={dismiss} className="min-h-11 shrink-0 rounded-xl px-3 font-bold underline underline-offset-4">
+          Got it
+        </button>
+      </div>
+    </div>
+  );
 }
 
 /** S2: progress header + store-shaped skeleton (not a spinner). */
-function Skeleton({ line, step = 0, slow = false }: { line: string; step?: number; slow?: boolean }) {
+function Skeleton({ line, name, offline = false }: { line: string; name?: string; offline?: boolean }) {
   const bar = "animate-pulse rounded-full bg-sand";
   return (
     <div aria-busy>
       <div className="sticky top-0 z-10 border-b border-line bg-surface">
         <div className="mx-auto max-w-[480px] space-y-3 px-5 py-4">
           <p className="flex items-start gap-2.5 font-bold leading-snug" aria-live="polite">
-            <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${slow ? "bg-saffron/40" : "animate-pulse bg-saffron"}`} />
+            <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${offline ? "bg-danger" : "animate-pulse bg-saffron"}`} />
             {line}
           </p>
-          <div className="grid grid-cols-4 gap-1.5">
-            {LINES.map((_, k) => (
-              <span key={k} className={`h-1 rounded-full ${k <= step ? "bg-saffron" : "bg-sand"}`} />
-            ))}
+          {/* V3: indeterminate indicator (no step bar). */}
+          <div className="relative h-1 overflow-hidden rounded-full bg-sand" role="progressbar" aria-label="Creating your store">
+            {!offline && <span className="absolute inset-y-0 w-1/3 rounded-full bg-saffron motion-safe:animate-[indeterminate_1.4s_ease-in-out_infinite]" />}
           </div>
         </div>
       </div>
       <Screen>
         <div className="flex flex-col items-center gap-3 pt-6">
           <div className="h-[72px] w-[72px] animate-pulse rounded-full bg-sand" />
-          <div className={`h-4 w-40 ${bar}`} />
+          {name ? <p className="font-display text-2xl font-bold">{name}</p> : <div className={`h-4 w-40 ${bar}`} />}
           <div className={`h-3 w-60 ${bar}`} />
         </div>
         <div className="mt-6 space-y-2">
@@ -241,11 +319,15 @@ function Screen({ children }: { children: ReactNode }) {
 
 /** S2b: a chip selects; "Use this" submits the selection (or the typed description). */
 function PickDirection({
+  token,
+  summary,
   question,
   directions,
   allowText,
   onPick,
 }: {
+  token: string;
+  summary: { teach: string; to: string };
   question: string;
   directions: string[];
   allowText: boolean;
@@ -266,6 +348,18 @@ function PickDirection({
         <div className="space-y-2">
           <h1 className="font-display text-[28px] font-bold leading-tight">{question}</h1>
           <p className="text-muted">Pick the one closest to you. A specific direction gets you a much better store.</p>
+        </div>
+        {/* V3: compact summary of their answers; editing re-runs the clarity check for this same store. */}
+        <div className="flex items-start justify-between gap-3 rounded-2xl border border-line bg-surface p-4 text-sm">
+          <p className="min-w-0">
+            <span className="text-muted">You teach </span>
+            <span className="font-semibold">{summary.teach}</span>
+            <span className="text-muted"> to </span>
+            <span className="font-semibold">{summary.to}</span>
+          </p>
+          <Link href={`/?edit=${encodeURIComponent(token)}`} className="shrink-0 font-bold text-saffron underline underline-offset-4">
+            Edit my answers
+          </Link>
         </div>
         <div className="space-y-2" role="radiogroup" aria-label="Directions">
           {directions.map((d) => {
