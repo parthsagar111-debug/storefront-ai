@@ -8,6 +8,19 @@ import { FORMATS } from "@/lib/ai/schemas";
 import { FORMAT_LABEL, PRICE_TABLE, rangeFor, formatINR } from "@/lib/pricing";
 import { normalizeIndianMobile } from "@/lib/whatsapp";
 
+/** QA-09: warn before leaving the page while a sheet has unsaved changes. */
+function useUnsavedGuard(dirty: boolean) {
+  useEffect(() => {
+    if (!dirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty]);
+}
+
 export type PatchFn = (body: unknown) => Promise<{ ok: true } | { ok: false; field?: string; error?: string }>;
 
 const CONFLICT_MSG = "This store changed in another tab. Refresh to see the latest.";
@@ -78,6 +91,7 @@ export function HeaderSheet({ draft, onClose, patch }: { draft: TStoreContent; o
   const [v, setV] = useState(initial);
   const [bad, setBad] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  useUnsavedGuard(JSON.stringify(v) !== JSON.stringify(initial));
   const needsWa = draft.products.some((p) => p.availability === "available");
 
   const save = async () => {
@@ -164,6 +178,7 @@ export function ProductSheet({
   }));
   const [v, setV] = useState(initial);
   const [whatsapp, setWhatsapp] = useState(draft.creator.whatsapp ?? "");
+  useUnsavedGuard(JSON.stringify(v) !== JSON.stringify(initial) || whatsapp !== (draft.creator.whatsapp ?? ""));
   const [bad, setBad] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const range = rangeFor(v.format);
