@@ -279,7 +279,8 @@ export default function StoreEditor({
   };
 
   const editingProduct = editingId ? draft.products.find((p) => p.id === editingId) : null;
-  const publishLabel = publishedAt && !dirty ? "Published" : "Publish";
+  // V5: republish is one tap "Update live store".
+  const publishLabel = publishedAt ? (dirty ? "Update live store" : "Published") : "Publish";
   const editAnswersHref = `/?edit=${encodeURIComponent(token)}`;
   const menuItem = "flex min-h-11 w-full items-center px-4 text-left text-sm font-bold text-ink active:bg-sand disabled:opacity-40";
 
@@ -568,6 +569,7 @@ export default function StoreEditor({
           draft={draft}
           token={token}
           slug={slug}
+          mode={publishedAt ? (dirty ? "update" : "share") : "form"}
           onClose={() => setSheet(null)}
           onPublished={(d, at, r) => {
             if (typeof r === "number") draftRevs.set(token, r);

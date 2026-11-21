@@ -373,59 +373,140 @@ export function ProductSheet({
   );
 }
 
-/** S4: WhatsApp step (only if no number yet) → "Your store is live". */
+/** V5 switch row for the readiness toggles. */
+function ReadyToggle({ on, onChange, title, price }: { on: boolean; onChange: (v: boolean) => void; title: string; price: number }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={`${title}: ${on ? "Available now" : "Coming soon"}`}
+      className="flex min-h-14 w-full items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-2 text-left"
+      onClick={() => onChange(!on)}
+    >
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold leading-snug [overflow-wrap:anywhere]">{title}</span>
+        <span className="text-sm text-muted">
+          {formatINR(price)} · {on ? "Available now" : "Coming soon"}
+        </span>
+      </span>
+      <span className={`relative h-7 w-12 shrink-0 rounded-full transition ${on ? "bg-teal" : "bg-line-input"}`} aria-hidden>
+        <span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${on ? "left-6" : "left-1"}`} />
+      </span>
+    </button>
+  );
+}
+
+const PRIVATE_WARNING = "Private: anyone with this link can edit your store. Don't forward it.";
+
+/**
+ * S4 Publish (SPEC v5 V5). `form` = first publish: readiness toggles + WhatsApp + sticky Publish, one request.
+ * `update` = republish with nothing to ask (one tap "Update live store"). `share` = already live, no changes.
+ * "Your store is live" only after the publish response confirms the save AND the public URL loads; otherwise the
+ * draft stays and Retry re-sends the same (idempotent) request.
+ */
 export function PublishSheet({
   draft,
   token,
   slug,
+  mode,
   onClose,
   onPublished,
 }: {
   draft: TStoreContent;
   token: string;
   slug: string;
+  mode: "form" | "update" | "share";
   onClose: () => void;
   onPublished: (draft: TStoreContent, publishedAt: string, draftRev?: number) => void;
 }) {
-  const [step, setStep] = useState<"ask" | "live">(draft.creator.whatsapp ? "live" : "ask");
-  const [url, setUrl] = useState<string | null>(null);
-  const [wa, setWa] = useState("");
+  const publicUrl = typeof window !== "undefined" ? `${location.origin}/s/${slug}` : "";
+  const [step, setStep] = useState<"form" | "working" | "retry" | "live">(mode === "form" ? "form" : mode === "share" ? "live" : "working");
+  const [ready, setReady] = useState<Record<string, boolean>>(() => Object.fromEntries(draft.products.map((p) => [p.id, p.availability === "available"])));
+  const [wa, setWa] = useState(draft.creator.whatsapp ?? "");
+  const [waFocus, setWaFocus] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [canShare, setCanShare] = useState(false);
+  const lastBody = useRef<object>({});
   const started = useRef(false);
-  const anyAvailable = draft.products.some((p) => p.availability === "available");
+  const anyReady = Object.values(ready).some(Boolean);
+  const waValid = Boolean(normalizeIndianMobile(wa));
 
-  const publish = async (whatsapp?: string) => {
-    setBusy(true);
+  useEffect(() => {
+    const t = setTimeout(() => setCanShare(typeof navigator !== "undefined" && typeof navigator.share === "function"), 0);
+    return () => clearTimeout(t);
+  }, []);
+
+  /** Publish, then confirm the public page actually loads (200 and not the "doesn't exist" view). */
+  const publish = async (body: object) => {
+    lastBody.current = body;
+    setStep("working");
     setErr(null);
-    const res = await fetch(`/api/stores/${encodeURIComponent(token)}/publish`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(whatsapp ? { whatsapp } : {}),
-    });
-    const body = await res.json().catch(() => ({}));
-    setBusy(false);
-    if (!res.ok) {
-      if (body.error === "invalid_whatsapp") setErr("Enter a 10-digit Indian mobile number.");
-      else if (body.error === "whatsapp_required") setErr("A product is Available now, so buyers need your WhatsApp number.");
-      else if (body.error === "invalid") setErr("Some fields are incomplete. Fix the highlighted product and try again.");
-      else setErr("Couldn't publish. Please try again.");
-      return;
+    let res: Response;
+    let out: { error?: string; url?: string; draft?: TStoreContent; publishedAt?: string; draftRev?: number } = {};
+    try {
+      res = await fetch(`/api/stores/${encodeURIComponent(token)}/publish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      out = await res.json().catch(() => ({}));
+    } catch {
+      setErr("Couldn't reach the server. Your draft is safe.");
+      return setStep("retry");
     }
-    setUrl(body.url);
+    if (!res.ok) {
+      const msg =
+        out.error === "invalid_whatsapp"
+          ? "Enter a 10-digit Indian mobile number."
+          : out.error === "whatsapp_required"
+            ? "A product is Available now, so buyers need your WhatsApp number."
+            : out.error === "invalid"
+              ? "Some fields are incomplete. Fix the highlighted product and try again."
+              : out.error === "changed_elsewhere"
+                ? CONFLICT_MSG
+                : null;
+      setErr(msg ?? "Couldn't publish. Your draft is safe.");
+      return setStep(msg && mode === "form" && out.error !== "changed_elsewhere" ? "form" : "retry");
+    }
+    onPublished(out.draft!, out.publishedAt!, out.draftRev);
+    let live = false;
+    for (let i = 0; i < 3 && !live; i++) {
+      try {
+        const page = await fetch(`/s/${slug}?v=${Date.now()}`, { cache: "no-store" });
+        const html = page.ok ? await page.text() : "";
+        // The rendered store carries data-store="<slug>" (the not-found view never does).
+        live = page.ok && html.includes(`data-store="${slug}"`);
+      } catch {}
+      if (!live) await new Promise((r) => setTimeout(r, 800));
+    }
+    if (!live) {
+      setErr("Saved, but we couldn't load your public page yet.");
+      return setStep("retry");
+    }
     setStep("live");
-    onPublished(body.draft, body.publishedAt, body.draftRev);
   };
 
-  // Number already on file → publish immediately (once).
+  // V5 republish: one tap, nothing to ask.
   useEffect(() => {
-    if (!draft.creator.whatsapp || started.current) return;
-    started.current = true;
-    const t = setTimeout(() => void publish(), 0);
+    if (mode !== "update") return;
+    // Guard inside the timer: a strict-mode effect re-run must not cancel the only publish.
+    const t = setTimeout(() => {
+      if (started.current) return;
+      started.current = true;
+      void publish({});
+    }, 0);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const submit = () => {
+    if (anyReady && !waValid) return setErr(wa ? "Enter a 10-digit Indian mobile number." : "Add your WhatsApp number so buyers can reach you.");
+    if (wa && !waValid) return setErr("Enter a 10-digit Indian mobile number.");
+    const availability = Object.fromEntries(Object.entries(ready).map(([id, on]) => [id, on ? "available" : "coming_soon"]));
+    publish({ availability, ...(wa && waValid ? { whatsapp: wa } : {}) });
+  };
 
   const copy = async (text: string, key: string) => {
     try {
@@ -436,57 +517,75 @@ export function PublishSheet({
       window.prompt("Copy this link:", text);
     }
   };
+  const share = async () => {
+    try {
+      await navigator.share({ title: draft.creator.displayName, url: publicUrl });
+    } catch {}
+  };
   const editUrl = typeof window !== "undefined" ? `${location.origin}/edit/${token}` : "";
-  const title = step === "ask" ? "How should buyers reach you?" : url ? "Your store is live 🎉" : "Publishing…";
+  const title = step === "form" ? "Publish your store" : step === "live" ? "Your store is live 🎉" : step === "retry" ? "Not published yet" : "Publishing…";
 
-  return (
-    <Sheet open onClose={onClose} title={title} hideHeader>
-      {step === "ask" ? (
-        <div className="space-y-5 pt-2">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-soft text-teal">
-            <IconChat size={26} />
-          </span>
+  if (step === "form") {
+    return (
+      <Sheet
+        open
+        onClose={onClose}
+        title={title}
+        footer={
+          <Button size="lg" className="w-full" onClick={submit}>
+            Publish
+          </Button>
+        }
+      >
+        <div className="space-y-3">
+          <h3 className="font-display text-lg font-bold">Any of these ready to sell today?</h3>
+          <p className="text-sm text-muted">Buyers will contact you on WhatsApp. Payments aren&apos;t collected on this store.</p>
           <div className="space-y-2">
-            <h2 className="font-display text-[28px] font-bold leading-tight">How should buyers reach you?</h2>
-            <p className="text-muted">Add your WhatsApp so people can message you about a product.</p>
+            {draft.products.map((p) => (
+              <ReadyToggle
+                key={p.id}
+                title={p.title}
+                price={p.price}
+                on={ready[p.id]}
+                onChange={(on) => {
+                  setReady({ ...ready, [p.id]: on });
+                  setErr(null);
+                }}
+              />
+            ))}
           </div>
-          <Field label="WhatsApp number" htmlFor="pub-wa" error={err} hint={<Privacy />}>
+          <p className="text-xs text-muted">Not ready yet? Leave it as Coming soon. Buyers can still tap I&apos;m interested.</p>
+        </div>
+        <Field
+          label={anyReady ? "WhatsApp number (needed)" : "WhatsApp number (optional)"}
+          htmlFor="pub-wa"
+          error={err}
+          hint={
+            <div className="space-y-1">
+              {anyReady && <p className="text-xs font-semibold text-ink/80">Needed because a product is Available now: buyers message you to buy.</p>}
+              {(waFocus || wa) && <Privacy />}
+            </div>
+          }
+        >
+          <div onFocus={() => setWaFocus(true)} onBlur={() => { setWaFocus(false); const n = normalizeIndianMobile(wa); if (n) setWa(n); }}>
             <PhoneInput
               id="pub-wa"
               value={wa}
               bad={Boolean(err)}
-              autoFocus
               onChange={(x) => {
                 setWa(x);
                 if (err) setErr(null);
               }}
             />
-          </Field>
-          <Button
-            size="lg"
-            className="w-full"
-            disabled={busy}
-            onClick={() => (normalizeIndianMobile(wa) ? publish(wa) : setErr("Enter a 10-digit Indian mobile number."))}
-          >
-            {busy ? "Publishing…" : "Publish with WhatsApp"}
-          </Button>
-          <div className="space-y-2">
-            <button
-              type="button"
-              disabled={busy || anyAvailable}
-              className={btnClass("secondary", "lg", "w-full border-saffron/40")}
-              onClick={() => publish()}
-            >
-              Publish without WhatsApp
-            </button>
-            <p className="text-center text-xs leading-relaxed text-muted">
-              {anyAvailable
-                ? "Publish without WhatsApp is off because a product is Available now. Buyers need a number to reach you."
-                : "Coming-soon products always show an I'm interested button. WhatsApp adds an Ask on WhatsApp option."}
-            </p>
           </div>
-        </div>
-      ) : url ? (
+        </Field>
+      </Sheet>
+    );
+  }
+
+  return (
+    <Sheet open onClose={onClose} title={title} hideHeader>
+      {step === "live" ? (
         <div className="space-y-5 pt-2">
           <div className="flex flex-col items-center gap-4 text-center">
             <span className="flex h-20 w-20 items-center justify-center rounded-full bg-teal text-white ring-8 ring-teal-soft">
@@ -497,22 +596,20 @@ export function PublishSheet({
           <div className="space-y-2">
             <p className="text-xs font-bold uppercase tracking-wider text-muted">Your public link</p>
             <div className="flex items-center gap-2 rounded-2xl border border-line bg-paper p-2 pl-4">
-              <span className="min-w-0 flex-1 truncate text-sm font-bold">{url.replace(/^https?:\/\//, "")}</span>
-              <Button variant="secondary" size="sm" onClick={() => copy(url, "pub")}>
+              <span className="min-w-0 flex-1 truncate text-sm font-bold">{publicUrl.replace(/^https?:\/\//, "")}</span>
+              <Button variant="secondary" size="sm" onClick={() => copy(publicUrl, "pub")}>
                 <IconCopy size={16} />
                 {copied === "pub" ? "Copied" : "Copy"}
               </Button>
             </div>
+            <p className="text-sm text-muted">Paste this link into your Instagram bio.</p>
           </div>
-          <a
-            className={btnClass("teal", "lg", "w-full")}
-            href={`https://wa.me/?text=${encodeURIComponent(`My store is live: ${url}`)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <IconChat size={20} />
-            Share on WhatsApp
-          </a>
+          {canShare && (
+            <Button size="lg" variant="teal" className="w-full" onClick={share}>
+              <IconChat size={20} />
+              Share your store
+            </Button>
+          )}
           <a href={`/s/${slug}`} target="_blank" rel="noopener noreferrer" className="block min-h-11 text-center text-sm font-bold text-saffron underline underline-offset-4">
             View my live store
           </a>
@@ -520,18 +617,37 @@ export function PublishSheet({
             <p className="flex gap-2 text-sm">
               <IconLock size={18} className="shrink-0" />
               <span>
-                <b>Save this link.</b> It&apos;s the only way to edit your store.
+                <b>Your private edit link.</b> {PRIVATE_WARNING}
               </span>
             </p>
             <p className="break-all rounded-lg bg-surface/70 px-3 py-2 font-mono text-xs text-ink">{editUrl}</p>
+            <a
+              className={btnClass("secondary", "md", "w-full border-warn-ink/25")}
+              href={`https://wa.me/?text=${encodeURIComponent(`My Storefront edit link: ${editUrl}\n${PRIVATE_WARNING}`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <IconChat size={16} />
+              Save my private edit link on WhatsApp
+            </a>
             <button type="button" className={btnClass("secondary", "md", "w-full border-warn-ink/25")} onClick={() => copy(editUrl, "edit")}>
               <IconCopy size={16} />
               {copied === "edit" ? "Copied" : "Copy edit link"}
             </button>
           </div>
         </div>
+      ) : step === "retry" ? (
+        <div className="space-y-4 pt-8 text-center">
+          <p className="font-display text-xl font-bold">Not published yet</p>
+          <p className="text-sm text-muted">{err} Your draft is safe.</p>
+          <Button size="lg" className="w-full" onClick={() => publish(lastBody.current)}>
+            Retry
+          </Button>
+        </div>
       ) : (
-        <p className="pt-8 text-center text-sm text-muted">{err ?? "Publishing your store…"}</p>
+        <p className="pt-8 text-center text-sm text-muted" role="status">
+          Publishing your store…
+        </p>
       )}
     </Sheet>
   );

@@ -5,7 +5,13 @@ import { storeForToken, notFound } from "@/lib/server/store-access";
 import { validateDraft } from "@/lib/server/rules";
 import { normalizeIndianMobile } from "@/lib/whatsapp";
 
-const Body = z.object({ whatsapp: z.string().trim().optional() }).nullable();
+// SPEC v5 V5: one sheet sends the readiness toggles (productId → availability) with the number, in one write.
+const Body = z
+  .object({
+    whatsapp: z.string().trim().optional(),
+    availability: z.record(z.string(), z.enum(["coming_soon", "available"])).optional(),
+  })
+  .nullable();
 
 /**
  * Draft → published snapshot (D10). Optional { whatsapp }. Rejects 400 when any product is Available now
@@ -33,6 +39,11 @@ export async function POST(req: Request, ctx: RouteContext<"/api/stores/[token]/
     store.draft_rev ?? 0,
     (latest) => {
       if (wa) latest.creator.whatsapp = wa;
+      // Only the products the sheet showed; never silently changes anything else.
+      for (const [id, a] of Object.entries(body.data?.availability ?? {})) {
+        const p = latest.products.find((x) => x.id === id);
+        if (p) p.availability = a;
+      }
       const v = validateDraft(latest);
       return v.ok ? v.draft : Response.json(v.err, { status: 400 });
     },
