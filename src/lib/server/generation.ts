@@ -42,18 +42,39 @@ export async function runGeneration(storeId: string, preClaimed?: StoreRow): Pro
   });
 
   // Only the run that still holds the claim may write (guards against a stale run finishing late).
-  const finish = (patch: Partial<StoreRow>) =>
-    db().from("stores").update(patch).eq("id", storeId).eq("status", "generating").eq("gen_started_at", claimedAt);
+  // IQA-05: report whether the row was really written, so events are only logged for writes that happened.
+  const finish = async (patch: Partial<StoreRow>): Promise<"written" | "claim_lost" | "error"> => {
+    const { data, error } = await db()
+      .from("stores")
+      .update(patch)
+      .eq("id", storeId)
+      .eq("status", "generating")
+      .eq("gen_started_at", claimedAt)
+      .select("id");
+    if (error) {
+      console.error("[gen] final write failed", storeId, error.message);
+      return "error";
+    }
+    return data && data.length > 0 ? "written" : "claim_lost";
+  };
+  /** A failed final write: log it; on a DB error also mark the store failed (still claim-guarded) so the UI offers Retry. */
+  const writeFailed = async (result: "claim_lost" | "error", meta: Record<string, unknown>) => {
+    if (result === "error") {
+      await db().from("stores").update({ status: "failed" }).eq("id", storeId).eq("status", "generating").eq("gen_started_at", claimedAt);
+    }
+    await logEvent(storeId, "generation_failed", { ...meta, reason: result === "error" ? "db_write" : "claim_lost" });
+  };
 
   if (!out.ok) {
-    await finish({ status: "failed" });
-    await logEvent(storeId, "generation_failed", { attempts: out.attempts, latencyMs: out.latencyMs });
+    const w = await finish({ status: "failed" });
+    await logEvent(storeId, "generation_failed", { attempts: out.attempts, latencyMs: out.latencyMs, ...(w === "written" ? {} : { write: w }) });
     return;
   }
 
   const { value, model, attempts, latencyMs } = out.result;
   if (value.kind === "ok") {
-    await finish({ status: "ready", draft: value.content, draft_rev: (store.draft_rev ?? 0) + 1, follow_up: null, model_used: model });
+    const w = await finish({ status: "ready", draft: value.content, draft_rev: (store.draft_rev ?? 0) + 1, follow_up: null, model_used: model });
+    if (w !== "written") return writeFailed(w, { model, attempts, latencyMs });
     await logEvent(storeId, "generation_completed", { model, attempts, latencyMs });
   } else {
     const prevRound = store.follow_up?.kind === "needs_more" ? store.follow_up.round : 0;
@@ -61,7 +82,8 @@ export async function runGeneration(storeId: string, preClaimed?: StoreRow): Pro
       value.kind === "needs_more"
         ? { kind: "needs_more", question: value.question, directions: value.directions, round: prevRound + 1 }
         : { kind: "unclear", reason: value.reason };
-    await finish({ status: "needs_input", follow_up, model_used: model });
+    const w = await finish({ status: "needs_input", follow_up, model_used: model });
+    if (w !== "written") return writeFailed(w, { model, attempts, latencyMs, outcome: value.kind });
     if (value.kind === "needs_more") await logEvent(storeId, "followup_shown", { round: follow_up.kind === "needs_more" ? follow_up.round : 0 });
     await logEvent(storeId, "generation_completed", { model, attempts, latencyMs, outcome: value.kind });
   }
