@@ -1739,3 +1739,281 @@ All rule checks pass on every stored draft (B7 + backstory + finance + "safe"). 
 }
 ```
 </details>
+
+## 12. Round 4 (Sun 22 Nov, production) — design polish, label rewrite, generic-reason check
+
+Final regression on production after deploying items 0–3: core gate **43/43**, `round3-ui.mjs` **12/12**, E25 / E26 **pass**, 21 screens × 360 px + 1440 px in `qa/screenshots/final/` (42 PNGs, no failures).
+
+### Confirmation generations (production, free tier)
+**Mistake, disclosed:** my summary command re-ran the eval script, so this step made **4 generations instead of 2**. The JSON below is the second run; the first run's printed output is summarised in the table.
+
+| Store | Run | Attempts | Price reasons mention the buyer | Raw follower labels | Notes |
+|---|---|---|---|---|---|
+| Cooking / Hinglish — Ananya, 5K–20K | 1 | primary ok (no fallback) | ✅ 3/3 (working professionals / busy buyers) | none | reason 1 says "a mid-sized audience" in natural words |
+| Finance — small business owners, under 5K | 1 | primary ok | ✅ 3/3 (business owners) | none | "Since you have a small early following…"; SIP planner for irregular income |
+| Cooking / Hinglish — Ananya | 2 (JSON) | primary ok | ✅ | none | ⚠️ bio uses **"Main sikhata hoon"** (masculine) for Ananya — PROMPTS v3/v5 gender rule not followed this time; not fixed in this round |
+| Finance — small business owners | 2 (JSON) | primary ok | ✅ | none | — |
+
+- **Item 3 (generic reasons → fallback):** 0 fires in the 6 generations logged in this round (core gate, E25, 4 eval runs): every primary answer named the buyer. It is covered by unit tests; `genericReasonsKept` is logged on every completed generation.
+- **Item 2 (label rewrite):** no raw label appeared in any reason this round, so it never had to rewrite; covered by unit tests (11 cases).
+- All rule checks pass; prices match the v5 table.
+
+Cooking (run 2) reasons:
+  - `ebook/low` ₹149 — *20-Minute Dinner Guide* — “With a mid-sized audience of working professionals looking for quick wins, a low-priced ebook makes it easy for busy fans to buy their first recipe guide.”
+  - `template_pack/typical` ₹399 — *Weekly Meal Prep Template Pack* — “For professionals who want to save time during weekdays, this typical-tier template pack offers structured planning tools that fit right into a busy routine.”
+  - `live_workshop/typical` ₹399 — *Quick Cooking Masterclass* — “A typical-tier live workshop gives working professionals direct access to a 90-minute session where they can learn live cooking shortcuts and ask questions…”
+
+Finance (run 2) reasons:
+  - `template_pack/low` ₹199 — *Business Money Tracking Sheet* — “With a small, early following, a low entry price makes it simple for business owners to try your tools without hesitation.”
+  - `recorded_course/typical` ₹1,499 — *Business Owner Investing Basics* — “A self-paced video course gives working owners the depth they need to learn at their own speed.”
+
+### Full JSON (run 2, stored drafts, no tokens)
+
+<details><summary>Cooking / Hinglish — Ananya</summary>
+
+```json
+{
+  "slug": "qa-ananya-sharma-lkpv",
+  "attempts": [
+    {
+      "ms": 2887,
+      "ok": true,
+      "model": "gemini-3.5-flash-lite"
+    }
+  ],
+  "genericReasonsKept": false,
+  "violations": [],
+  "words": {
+    "headline": [
+      7,
+      true
+    ],
+    "bio": [
+      24,
+      true
+    ],
+    "products": [
+      {
+        "title": [
+          3,
+          true
+        ],
+        "summary": [
+          9,
+          true
+        ],
+        "description": [
+          32,
+          true
+        ],
+        "trimmed": false
+      },
+      {
+        "title": [
+          5,
+          true
+        ],
+        "summary": [
+          10,
+          true
+        ],
+        "description": [
+          28,
+          true
+        ],
+        "trimmed": false
+      },
+      {
+        "title": [
+          3,
+          true
+        ],
+        "summary": [
+          8,
+          true
+        ],
+        "description": [
+          28,
+          true
+        ],
+        "trimmed": true
+      }
+    ]
+  },
+  "pricesMatchV5": true,
+  "rawNoAudienceLabel": 0,
+  "draft": {
+    "theme": "saffron",
+    "creator": {
+      "bio": "Working professionals ke liye ghar ka khana banana ab easy hai. Main sikhata hoon quick recipes jo office ke baad bhi fatakat ban jaayein.",
+      "headline": "Roz ka khana, bas 20 minute mein",
+      "displayName": "QA Ananya Sharma"
+    },
+    "language": "hinglish",
+    "products": [
+      {
+        "id": "lbkiLhSA",
+        "tier": "low",
+        "price": 149,
+        "title": "20-Minute Dinner Guide",
+        "format": "ebook",
+        "summary": "12 quick dinner recipes that ready under 20 minutes.",
+        "tierReason": "With a mid-sized audience of working professionals looking for quick wins, a low-priced ebook makes it easy for busy fans to buy their first recipe guide.",
+        "whatYouGet": [
+          "PDF recipe guide with 12 dishes",
+          "Step-by-step cooking instructions",
+          "Weekly grocery shopping list"
+        ],
+        "description": "Busy office days ke baad khana banana lagta hai ek task? Yeh ebook deta hai 12 quick dinner recipes jo bina kisi jhanjhat ke sirf 20 minute mein ready ho jaati hain.",
+        "priceSource": "ai_tier",
+        "availability": "coming_soon"
+      },
+      {
+        "id": "1dxMYQz7",
+        "tier": "typical",
+        "price": 399,
+        "title": "Weekly Meal Prep Template Pack",
+        "format": "template_pack",
+        "summary": "Ready templates to plan your weekly meals and kitchen stock.",
+        "tierReason": "For professionals who want to save time during weekdays, this typical-tier template pack offers structured planning tools that fit right into a busy routine.",
+        "whatYouGet": [
+          "Weekly meal planner template",
+          "Kitchen pantry stock checklist",
+          "Smart vegetable prep tracker"
+        ],
+        "description": "Kitchen mein roz kya banega sochna band karo. Yeh templates aapko help karenge apne poore hafte ka khana pehle se plan karne mein, taaki cooking routine smooth chale.",
+        "priceSource": "ai_tier",
+        "availability": "coming_soon"
+      },
+      {
+        "id": "QrSX9kko",
+        "tier": "typical",
+        "price": 399,
+        "title": "Quick Cooking Masterclass",
+        "format": "live_workshop",
+        "summary": "A 90-minute live session on fast cooking techniques.",
+        "tierReason": "A typical-tier live workshop gives working professionals direct access to a 90-minute session where they can learn live cooking shortcuts and ask questions…",
+        "whatYouGet": [
+          "90-minute live workshop on Zoom",
+          "Recording access for 30 days",
+          "Bonus list of kitchen hacks"
+        ],
+        "description": "Live session join karo jahan main aapko dikhaunga kaise daily meals ko fast aur tasty banate hain. Apne saare cooking doubts live clear karo aur kitchen tricks seekho.",
+        "priceSource": "ai_tier",
+        "availability": "coming_soon"
+      }
+    ],
+    "sensitiveDomain": "none"
+  }
+}
+```
+</details>
+<details><summary>Finance — small business owners</summary>
+
+```json
+{
+  "slug": "qa-meera-iyer-5wz2",
+  "attempts": [
+    {
+      "ms": 2000,
+      "ok": true,
+      "model": "gemini-3.5-flash-lite"
+    }
+  ],
+  "genericReasonsKept": false,
+  "violations": [],
+  "words": {
+    "headline": [
+      8,
+      true
+    ],
+    "bio": [
+      24,
+      true
+    ],
+    "products": [
+      {
+        "title": [
+          4,
+          true
+        ],
+        "summary": [
+          9,
+          true
+        ],
+        "description": [
+          21,
+          true
+        ],
+        "trimmed": false
+      },
+      {
+        "title": [
+          4,
+          true
+        ],
+        "summary": [
+          11,
+          true
+        ],
+        "description": [
+          27,
+          true
+        ],
+        "trimmed": false
+      }
+    ]
+  },
+  "pricesMatchV5": true,
+  "rawNoAudienceLabel": 0,
+  "draft": {
+    "theme": "indigo",
+    "creator": {
+      "bio": "I help small business owners manage cash flow and invest their earnings. Get practical systems to separate your money and build a clear plan.",
+      "headline": "Simple investing and money systems for business owners",
+      "displayName": "QA Meera Iyer"
+    },
+    "language": "en",
+    "products": [
+      {
+        "id": "u8NezQHk",
+        "tier": "low",
+        "price": 199,
+        "title": "Business Money Tracking Sheet",
+        "format": "template_pack",
+        "summary": "Ready-to-use tracker to separate business cash and personal savings.",
+        "disclaimer": "For learning only. Not investment advice.",
+        "tierReason": "With a small, early following, a low entry price makes it simple for business owners to try your tools without hesitation.",
+        "whatYouGet": [
+          "Google Sheets financial tracking dashboard",
+          "Video guide on setting up your categories",
+          "Monthly cash flow summary checklist"
+        ],
+        "description": "Stop mixing your business earnings with household expenses. Use this simple spreadsheet to track monthly revenue, tax reserves, and personal draws.",
+        "priceSource": "ai_tier",
+        "availability": "coming_soon"
+      },
+      {
+        "id": "291bpwR_",
+        "tier": "typical",
+        "price": 1499,
+        "title": "Business Owner Investing Basics",
+        "format": "recorded_course",
+        "summary": "Step-by-step video lessons on building an investment plan from business income.",
+        "disclaimer": "For learning only. Not investment advice.",
+        "tierReason": "A self-paced video course gives working owners the depth they need to learn at their own speed.",
+        "whatYouGet": [
+          "10 short video lessons on core concepts",
+          "Printable PDF workbook with exercises",
+          "Sample asset allocation frameworks"
+        ],
+        "description": "Learn how to build a reliable investment routine when your monthly revenue fluctuates. This course covers core concepts like asset allocation, index funds, and systematic investing plans.",
+        "priceSource": "ai_tier",
+        "availability": "coming_soon"
+      }
+    ],
+    "sensitiveDomain": "finance"
+  }
+}
+```
+</details>

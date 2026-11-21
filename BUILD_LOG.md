@@ -4,6 +4,32 @@ Per slice: what was built, problems hit, decisions made, how AI tools were used.
 
 ---
 
+## 🛠 Round 4 — Sun 22 Nov, overnight (design polish + 3 fixes + final regression; details in QA_REPORT §12)
+Tag `pre-round-4` = state before. One deploy (items 0–3); final regression on production all green; production left at **0 stores, 0 events**.
+
+| Item | Change | Commit | Verified |
+|---|---|---|---|
+| 0 | New Claude Design export + v5 tokens; 26 frames rendered to `Design/png/` (named by frame); TOKENS.md footer → "SPEC.md v5 wins on copy and behaviour" | `8b38b2b` | 26 PNGs |
+| 1 | Design polish (visual only) to the v5 frames: S1 card + 26 px labels, sliding bar, interrupted / offline (Try again only when online) / follow-up card, editor top bar + ⋯ menu + tip tooltip + regenerate sheet + Undo toast + red Remove + Start over? dialog, buyer bar, publish sheet (switch rows, Required pill + Claude Design's reason copy, privacy line, pinned Publish), success screen (Share + Copy, Instagram line, View my live store, private block), public groups + indicative / chat-to-buy lines | `32ce7cb` | `qa/screenshots/final/` 42 PNGs vs frames; UI checks 12/12 |
+| 2 | Raw follower labels in price reasons rewritten (No audience yet → "as a new creator", Under 5K → "with a small, early following", 5K–20K → "with a growing following", 20K+ → "with an established following", "the creator's audience size" → "your audience") | `51aa88d` | 11 unit tests |
+| 3 | No price reason mentions the buyer → fails the primary attempt only (→ fallback); fallback accepted; logged (`generic tier reasons…` attempt error, `genericReasonsKept` in meta) | `42eada7` + `319e91b` (type fix — I committed `42eada7` with a type error and fixed it right after, before any deploy) | unit tests; 0 fires in 6 live generations |
+| 4 | Final regression on production | — | core gate **43/43** · `round3-ui.mjs` **12/12** · E25 / E26 **pass** · 21 screens × 360 + 1440 screenshots · 2 confirmation generations (run twice by mistake → 4) |
+
+**Confirmation generations (QA_REPORT §12):** cooking/Hinglish and finance for small business owners — primary model answered both times, every price reason names the buyer, no raw labels, all rules pass, v5 prices. **New finding:** in the second cooking run the Hinglish bio uses *"Main sikhata hoon"* (masculine) for Ananya — the gender rule is in the prompt but wasn't followed; not fixed (needs a decision: a deterministic check that fails the primary attempt, like item 3, is the obvious option).
+
+**Decisions logged (round 4):**
+- Design vs SPEC: SPEC wins on copy; where the frames only change layout I followed the frames — "Start over / Edit answers" now sits in ⋯ on desktop too (it was a top-bar button), the Start over confirmation keeps SPEC's text but is titled "Start over?" with a "Start over" button, the success screen drops the 🎉 and no longer prints the raw edit URL (Copy and the WhatsApp save still carry it).
+- S1 keeps the sticky, keyboard-safe Create button (QA-07) instead of the frame's in-flow button.
+- Offline: going offline while loading/generating shows the offline screen until "Try again", which is enabled only when `navigator.onLine` is true and then resumes polling.
+- The bio regenerate sheet is titled "Regenerate your bio" (the frame only shows the product version).
+- Item 3 ignores a few non-buyer words (with, from, their, …) when matching audience words.
+
+**Mistakes, disclosed:** a summary command re-ran the eval (4 generations instead of 2) and the screenshot script also ran twice (no AI, cleans up after itself).
+
+**Not done / open:** key rotation (item 0 of earlier rounds) — waiting for Parth's keys; Gemini 3.8 switch — waiting for billing; Hinglish gender slip above.
+
+---
+
 ## 🛠 Round 3 — Sun 22 Nov (BUILD_ROUND_3; SPEC v5 / PROMPTS v5; details in QA_REPORT §11)
 Tag `pre-round-3` = state before. Deploys after 1–3, 4–6, 7–9 (+ one for an eval fix); **core gate 43/43 after every deploy**; round-3 UI checks 12/12 and E25/E26 pass on production.
 
