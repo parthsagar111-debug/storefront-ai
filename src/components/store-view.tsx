@@ -78,20 +78,20 @@ export function StoreView(props: StoreViewProps) {
         >
           {initials(c.displayName)}
         </div>
-        <h1 className="mt-4 font-display text-[28px] font-bold leading-tight">{c.displayName}</h1>
-        <p className="mt-1 font-semibold">{c.headline}</p>
+        <h1 className="mt-4 max-w-full font-display text-[28px] font-bold leading-tight [overflow-wrap:anywhere]">{c.displayName}</h1>
+        <p className="mt-1 max-w-full font-semibold [overflow-wrap:anywhere]">{c.headline}</p>
         {c.instagramHandle && (
           <a
             href={`https://instagram.com/${c.instagramHandle}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-2 inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold"
+            className="mt-2 inline-flex min-h-11 max-w-full items-center gap-1.5 text-sm font-semibold [overflow-wrap:anywhere]"
             style={{ color: t.accent }}
           >
             <IconInstagram size={16} />@{c.instagramHandle}
           </a>
         )}
-        <p className="mt-3 text-left leading-relaxed text-ink/90">{c.bio}</p>
+        <p className="mt-3 w-full text-left leading-relaxed text-ink/90 [overflow-wrap:anywhere]">{c.bio}</p>
       </div>
     </header>
   );
@@ -178,11 +178,12 @@ function ProductCard({ p, theme, cta, footer, busy }: { p: TProduct; theme: (typ
           </span>
         </div>
         <div className="space-y-3 p-4">
+          {/* QA-04: the title column can shrink and wrap anywhere, so long words never push the price off the card. */}
           <div className="flex items-start justify-between gap-3">
-            <h2 className="font-display text-lg font-bold leading-snug">{p.title}</h2>
-            <span className="shrink-0 font-display text-[21px] font-bold leading-tight">{formatINR(p.price)}</span>
+            <h2 className="min-w-0 flex-1 font-display text-lg font-bold leading-snug [overflow-wrap:anywhere]">{p.title}</h2>
+            <span className="shrink-0 font-display text-[21px] font-bold leading-tight [overflow-wrap:anywhere]">{formatINR(p.price)}</span>
           </div>
-          <p className="text-sm leading-relaxed text-muted">{p.summary}</p>
+          <p className="text-sm leading-relaxed text-muted [overflow-wrap:anywhere]">{p.summary}</p>
           {cta}
         </div>
         <button
@@ -195,7 +196,7 @@ function ProductCard({ p, theme, cta, footer, busy }: { p: TProduct; theme: (typ
           {open ? <IconChevronUp size={16} /> : <IconChevronDown size={16} />}
         </button>
         {open && (
-          <div className="space-y-3 px-4 pb-4 text-sm leading-relaxed text-ink/85">
+          <div className="space-y-3 px-4 pb-4 text-sm leading-relaxed text-ink/85 [overflow-wrap:anywhere]">
             <p>{p.description}</p>
             <p className="text-xs font-bold uppercase tracking-wider text-muted">What you get</p>
             <ul className="space-y-2">

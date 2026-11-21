@@ -133,7 +133,7 @@ export default function StoreEditor({
     if (why !== p.id) return null;
     const range = rangeFor(p.format);
     return (
-      <div className="mb-2 space-y-1 rounded-2xl bg-saffron-soft px-4 py-3 text-sm text-ink">
+      <div className="mb-2 space-y-1 rounded-2xl bg-saffron-soft px-4 py-3 text-sm text-ink [overflow-wrap:anywhere]">
         <p>{p.priceSource === "creator" ? "You set this price." : p.tierReason}</p>
         <p className="font-bold text-saffron-ink">
           Typical range for {FORMAT_LABEL[p.format].toLowerCase()}s: {formatINR(range.min)}–{formatINR(range.max)}
@@ -174,7 +174,7 @@ export default function StoreEditor({
             <Logo withName={false} />
           </span>
           <div className="min-w-0 flex-1 md:flex md:items-center md:gap-3">
-            <p className="truncate font-bold md:text-lg">{draft.creator.displayName}</p>
+            <p className="min-w-0 truncate font-bold md:text-lg">{draft.creator.displayName}</p>
             <StatusBadge kind={badge} />
           </div>
           {publishedAt && (
