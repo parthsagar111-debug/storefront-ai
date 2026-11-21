@@ -61,6 +61,9 @@ export const FINANCE_ADVICE_PATTERNS: RegExp[] = [
   /\bbuy[ /-]sell (call|tip)s?\b/i,
   /\bmultibaggers?\b/i,
   /\bstock tips?\b/i,
+  // Round 2: "safe"-type wording within ~4 words of an investment word, in either order (PROMPTS v3 finance rule).
+  /\b(safe|safely|risk[- ]free|secure|guaranteed)\b(?:\W+\w+){0,4}?\W+(invest|investing|investments?|stocks?|returns)\b/i,
+  /\b(invest|investing|investments?|stocks?|returns)\b(?:\W+\w+){0,4}?\W+(safe|safely|risk[- ]free|secure|guaranteed)\b/i,
 ];
 
 export function checkClaims(texts: string[], input: StoreInput, domain: Domain = "none") {

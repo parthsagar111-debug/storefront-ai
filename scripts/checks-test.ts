@@ -96,6 +96,12 @@ for (const txt of ["1-on-1 Portfolio Review Call", "Personalised feedback on you
   t(`finance blocked: "${txt}"`, throws(() => checkClaims([txt], input({ expertise: "Stock market basics" }), "finance")));
 for (const txt of ["How the stock market works", "Build a habit of investing small amounts", "Understand mutual funds and SIPs", "Read a company balance sheet", "Avoid common beginner traps"])
   t(`finance allowed: "${txt}"`, !throws(() => checkClaims([txt], input({ expertise: "Stock market basics" }), "finance")));
+// Round 2: finance "safe"-type wording near investment words (both orders, ≤ ~4 words apart)
+for (const txt of ["Safe Investing Concepts Workshop", "Start investing safely with small amounts", "safely invest your pocket money", "Risk-free returns every month", "secure investment options for students", "stocks that are completely safe", "Guaranteed returns on your SIP", "risk free stock picks", "Chote amounts se safely invest karo"])
+  t(`finance safe-wording blocked: "${txt}"`, throws(() => checkClaims([txt], input({ expertise: "Stock market basics" }), "finance")));
+for (const txt of ["Invest carefully, step by step, with a clear plan", "A safe space to ask your doubts", "Keep your demat login secure while you slowly learn about stocks", "Learn how the stock market works", "Build a budget before you start investing", "Returns are never certain; learn the risks"])
+  t(`finance safe-wording allowed: "${txt}"`, !throws(() => checkClaims([txt], input({ expertise: "Stock market basics" }), "finance")));
+t("safe-wording check inactive outside finance", !throws(() => checkClaims(["A safe home workout to invest 20 minutes in yourself"], input({ expertise: "Fitness" }), "health")));
 t("finance patterns inactive outside finance", !throws(() => checkClaims(["Portfolio review of your design work"], input({ expertise: "Graphic design" }), "none")));
 // QA-02 Instagram parsing
 for (const [raw, want] of [
