@@ -53,6 +53,20 @@ Card shadow: `0 1px 2px rgba(34,26,20,.04), 0 8px 24px rgba(34,26,20,.06)`.
 Prices: `Intl.NumberFormat('en-IN')` → ₹1,999 · ₹99,999.
 
 ## Screens (rendered references in `png/`)
-01 S1 input · 02–03 S2 generating (+ slow) · 04 S2b direction · 05 S2c unclear · 06 S2c retry · 07–08 S3 editor (top, Why ₹ open, regenerating overlay) · 09 product edit sheet · 10 D7 rejected alternative · 11 editor desktop 1440 with side panel · 12–13 S4 publish steps · 14 S5 public store · 15 S6 not found · 16 S5 desktop 1440 · 17 tokens + covers.
+Frames are rendered to `Design/png/` by `scripts/render-design.mjs`, one PNG per frame, named by frame (01-s1-input-default … 26-design-tokens-format-covers).
 
-Where the design's copy differs from SPEC.md (e.g. "Publish with/without WhatsApp"), the build follows SPEC.md.
+**SPEC.md v5 wins on copy and behaviour** wherever this file or the design export differs.
+
+## v5 additions (21 Nov) — new tokens only, nothing above changed
+| Token | Value | Used for |
+|---|---|---|
+| danger | `#B42318` text/icon, border `#F1C4BF` | Remove product, Delete store |
+| on-ink link | `#FDBA74` on ink `#221A14` | "Undo" in the toast, "Back to editing" in the buyer-view bar |
+| toast / tip surface | ink `#221A14`, white text, radius 14, shadow `0 10px 24px rgba(34,26,20,.25)` | "Regenerated. Undo" toast, one-time "Tap Edit…" tip |
+| private-note surface | bg `#FFF8E6`, border `#F3E2AE`, text `#6B4A00` / heading `#4A3300` | Private edit-link block on the success screen |
+| calm warning | bg `#FFFAEB`, border `#F3E2AE`, field border `#E0C27A` | Above-range price warning |
+| switch | on `#0F766E`, off `#D9CCBC`, track 52×32, hit area 56×44 | "Ready to sell today?" toggles |
+| indeterminate bar | track `#F1E9DE`, 40 % accent segment, 1.3 s ease-in-out | Generating |
+| menu | white, border `#EADFD1`, radius 16, items 48 px, shadow `0 16px 40px rgba(34,26,20,.18)` | Editor "⋯" menu |
+
+Sentence labels on S1 ("I'm" / "I teach" / "to"): Bricolage Grotesque 700, 26 px, line-height 1, inside one white card (radius 22), 20 px between parts.
