@@ -1,4 +1,4 @@
-# PROMPTS.md — Gemini prompt text (v1)
+# PROMPTS.md — Gemini prompt text (v2, after QA: QA-03, QA-10, product-mix repetition)
 
 > Companion to SPEC.md v4.4 (§7). Claude Code puts these in `lib/ai/prompts.ts` as template functions.
 > `{{...}}` = values inserted by code. Never insert rupee numbers into any prompt (the model reasons in tiers; code sets prices).
@@ -37,6 +37,8 @@ Weigh: how deep the product is, how much live time it costs the creator, how spe
 - Include a premium option (one_on_one or cohort_course) only if it genuinely fits this creator.
 - Each product must solve a different problem for the buyer, not repeat the same content in another format.
 - Only suggest things this creator could realistically make and deliver within a few weeks.
+- Fit the formats to the niche and the creator, not to a default pattern. Don't fall back on "ebook + template pack + workshop" unless it truly suits this niche. Ask: how do people in this niche actually learn and buy? (Exam prep: mock tests, answer-writing practice, mentorship. Fitness: guided programmes, plans, check-ins. Design: templates, tool courses, reviews. Cooking: recipe collections, meal plans, live cook-alongs. Coaching: 1:1 sessions, frameworks.)
+- With 20K or more followers, include at least one core product above the entry level (recorded_course, cohort_course, one_on_one, or a typical/high live_workshop), so the store has a real step up from the cheapest product.
 
 ## Writing rules
 - Concrete beats vague. Say "12 dinner recipes under 20 minutes", not "delicious recipes". Use counts, durations and topics.
@@ -50,8 +52,11 @@ Weigh: how deep the product is, how much live time it costs the creator, how spe
 
 ## Honesty rules (never break these)
 - Use only facts from the creator's input. Never invent credentials, certifications, degrees, years of experience, follower counts, client numbers, earnings, testimonials or awards.
+- Never invent personal history, job titles or life events. Don't write "after my own experience…", "as a mother…", "as a certified coach…", "I've been doing this for years…" or similar unless the input says it. Describe what the creator helps people do, not who they are beyond the input.
 - Never promise results: no "guaranteed", no "100%", no specific weight-loss, income or exam-score numbers.
 - Finance topics: education only. No stock tips, buy or sell calls, portfolio advice, return figures, or claims of SEBI registration unless the input says so. Set sensitiveDomain to "finance".
+  - Never offer portfolio reviews or audits, feedback on someone's stocks or holdings, "which stock to buy", "safe stocks", "multibaggers" or any personalised investment recommendation, including in 1:1 calls.
+  - Offer concepts, processes and tools instead: how markets work, how to read a balance sheet, how to build a budget or an SIP plan, how to research a company, a 1:1 call to clear doubts about concepts or to make a learning plan.
 - Health, fitness, diet, sleep, hormonal or mental-health topics: no diagnosing or treating conditions and no medical claims. Set sensitiveDomain to "health".
 - Otherwise set sensitiveDomain to "none".
 
