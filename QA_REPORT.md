@@ -465,4 +465,327 @@ They carry the "QA " prefix in the name; rename in the editor (or create fresh s
 
 ---
 
+## 9. After fixes (Sat 21 Nov, production)
+
+Fixes QA-01…06, IQA-01…06, PROMPTS v2 (item 6) and the new `checkClaims` patterns (item 7) are live (production deployment of `047c199`). Core gate: **43/43** after each of the three deploys.
+
+### QA-01 latency, before vs after (`iad1` → `hnd1`)
+| | Before (`iad1`) | After (`hnd1`) |
+|---|---|---|
+| GET `/api/stores/<token>` (6 samples) | median **1747 ms** (1394–3642) | median **416 ms** (269–839) |
+| Tap Create → edit page | 4.3 s | **2.0 s** |
+| Tap Create → ready editor (real generation) | 8.8 s | **5.4 s** |
+
+### Eval re-run (§16 inputs, 1 generation each, production)
+Rule check = B7 checks + QA-03 backstory patterns + QA-10 finance-advice patterns.
+
+| # | Input | Expected | Status | Formats (tier, price) | ebook+template+workshop? | Step-up product? | Rule check | Attempts |
+|---|---|---|---|---|---|---|---|---|
+| 1 | cooking | ok | ok ✅ | ebook/low ₹149, template_pack/typical ₹399, live_workshop/typical ₹499 | yes | yes | ✅ none | 2 (primary: {"error":{"code":503,"message":"This mod…) |
+| 2 | fitness-new-moms | ok | ok ✅ | ebook/low ₹149, recorded_course/typical ₹1499, one_on_one/high ₹1999 | no | yes | ✅ none | 1 |
+| 3 | finance | ok | ok ✅ | ebook/low ₹149, template_pack/typical ₹399, live_workshop/typical ₹499 | yes | yes | ✅ none | 2 (primary: finance advice: "stock tips"…) |
+| 4 | upsc | ok | ok ✅ | template_pack/low ₹199, live_workshop/typical ₹499, cohort_course/high ₹7999 | no | yes | ✅ none | 2 (primary: {"error":{"code":503,"message":"This mod…) |
+| 5 | astrology | ok | ok ✅ | ebook/low ₹149, template_pack/typical ₹399, one_on_one/typical ₹999 | no | yes | ✅ none | 1 |
+| 6 | canva | ok | ok ✅ | template_pack/low ₹199, live_workshop/typical ₹499, one_on_one/high ₹1999 | no | yes | ✅ none | 1 |
+| 7 | career-coach | ok (1:1-led) | ok ✅ | template_pack/low ₹199, live_workshop/typical ₹499, one_on_one/typical ₹999 | no | yes | ✅ none | 2 (primary: {"error":{"code":503,"message":"This mod…) |
+| 8 | yoga-seniors | ok | ok ✅ | ebook/low ₹149, one_on_one/typical ₹999, recorded_course/typical ₹1499 | no | yes | ✅ none | 1 |
+| 9 | thin | needs_more | needs_more ✅ | — | — | — | ✅ none | 1 |
+| 10 | gibberish | unclear | unclear ✅ | — | — | — | ✅ none | 1 |
+| 11 | 2000-chars | ok, truncated | ok ✅ | ebook/low ₹149, template_pack/typical ₹399, live_workshop/typical ₹499 | yes | yes | ✅ none | 1 |
+| 12 | unsafe | unclear | unclear ✅ | — | — | — | ✅ none | 2 (primary: {"error":{"code":503,"message":"This mod…) |
+
+**Summary**
+- **Statuses:** 12/12 correct (8 + #11 `ok`, #9 `needs_more` with 3 distinct directions, #10 and #12 `unclear`).
+- **Invented backstory / finance advice in the stored output:** none (0 violations on all 12). The new code check **did fire once**: on #3 (finance) the primary model wrote "stock tips"; the attempt was rejected and the fallback model produced a compliant store. Residual soft spots (not rule breaks): the finance store has a "Safe Investing Concepts Workshop" and "safely invest" wording, and an "Investment Portfolio Tracker" template (a tool for tracking your own investments, not a review).
+- **Product mix:** the ebook + template pack + live workshop set now appears in **3 of 9** `ok` stores (cooking, finance, the 2,000-char cooking input) — down from 9 of 15 in the QA run. Recorded courses, a cohort course and 1:1s now appear where they fit (fitness, UPSC, astrology, yoga, Canva, coach).
+- **UPSC 100K+ step-up:** **yes** — template pack ₹199 → answer-writing workshop ₹499 → **UPSC Mains Strategy Cohort ₹7,999**. Fitness (20K–100K) also has a step-up (recorded course ₹1,499, 1:1 ₹1,999).
+- **Availability:** the primary model returned 503 on 4/12 calls; the fallback rescued all of them.
+- **Minor:** the yoga Hinglish bio mixes "karti hoon" and "sikhata hoon" (gender agreement).
+
+### Full JSON (stored drafts, no tokens)
+
+<details><summary>Cooking / Hinglish (#1)</summary>
+
+```json
+{
+  "theme": "saffron",
+  "creator": {
+    "bio": "Hi, main Ananya. Main aapko batati hoon kaise office ke baad thakne par bhi aap ghar ka swadisht khana jaldi bana sakte hain. Bina zyada time kharab kiye, roz ke healthy aur tasty meals prepare karne mein main aapki madad karti hoon.",
+    "headline": "Roz ka khana, bas 20 minute mein",
+    "displayName": "QA Eval Ananya"
+  },
+  "language": "hinglish",
+  "products": [
+    {
+      "id": "5sLDqlgE",
+      "tier": "low",
+      "price": 149,
+      "title": "20-Minute Weeknight Meal Plan",
+      "format": "ebook",
+      "summary": "15 simple recipes for tasty meals under 20 minutes.",
+      "tierReason": "A small, quick-win guide for beginners to get started easily.",
+      "whatYouGet": [
+        "PDF guide with 15 recipes",
+        "Prep-ahead tips for each recipe",
+        "Weekly grocery shopping checklist"
+      ],
+      "description": "Thak kar ghar aane ke baad bhi healthy khana banana ab possible hai. Is ebook mein aapko milenge quick recipes jo office ke baad kitchen mein aapka time bachaengi aur aapko ghar ka swaad dengi.",
+      "priceSource": "ai_tier",
+      "availability": "coming_soon"
+    },
+    {
+      "id": "VELAonEQ",
+      "tier": "typical",
+      "price": 399,
+      "title": "Kitchen Efficiency Templates",
+      "format": "template_pack",
+      "summary": "Templates to organise your kitchen and weekly meal prep.",
+      "tierReason": "Solid, practical tools that provide ongoing value for meal planning.",
+      "whatYouGet": [
+        "Digital weekly meal planner template",
+        "Customisable grocery inventory sheet",
+        "Kitchen pantry staple checklist"
+      ],
+      "description": "Apne kitchen ko manage karna ab simple hai. Ye templates aapko help karenge grocery list banane mein aur pura hafta kya banana hai, ye pehle se plan karne mein, taaki aapka time aur energy dono bache.",
+      "priceSource": "ai_tier",
+      "availability": "coming_soon"
+    },
+    {
+      "id": "kyD_hAOx",
+      "tier": "typical",
+      "price": 499,
+      "title": "Mastering 20-Minute Cooking",
+      "format": "live_workshop",
+      "summary": "Learn my exact process to cook fast, healthy meals live.",
+      "tierReason": "A live interactive session that offers deeper engagement and real-time learning.",
+      "whatYouGet": [
+        "90-minute live cooking workshop",
+        "Real-time Q&A with Ananya",
+        "Recording of the live session"
+      ],
+      "description": "Is live session mein hum saath mein cook karenge. Main aapko dikhaungi ki kaise ingredients ko smart tarike se use karke aap 20 minute mein complete meal taiyaar kar sakte hain. Aap apne doubts live puch sakte hain.",
+      "priceSource": "ai_tier",
+      "availability": "coming_soon"
+    }
+  ],
+  "sensitiveDomain": "none"
+}
+```
+</details>
+
+<details><summary>Finance / Hinglish (#3)</summary>
+
+```json
+{
+  "theme": "indigo",
+  "creator": {
+    "bio": "Main Arjun hoon, aur main college students ko stock market ki basics samajhne mein help karta hoon. Mera goal hai ki aap chote amounts se safely invest karna shuru kar sakein, bina dar ya confusion ke. Let's make your first investment journey simple.",
+    "headline": "Stock market basics seekho, bina kisi stress ke",
+    "displayName": "QA Eval Arjun"
+  },
+  "language": "hinglish",
+  "products": [
+    {
+      "id": "WQUa5oCs",
+      "tier": "low",
+      "price": 149,
+      "title": "Stock Market Basics Starter Guide",
+      "format": "ebook",
+      "summary": "Ek simple guide jo aapko stock market ke basics step-by-step samjhayegi.",
+      "disclaimer": "For learning only. Not investment advice.",
+      "tierReason": "This is a quick-read PDF meant for beginners who want a low-cost entry point into the topic.",
+      "whatYouGet": [
+        "PDF handbook on stock market basics",
+        "Glossary of common trading terms",
+        "Checklist for your first demat account"
+      ],
+      "description": "Naye investors ke liye ek simple handbook. Isme stocks, dividends, aur risk manage karne ke basic concepts hain jo har student ko pata hone chahiye.",
+      "priceSource": "ai_tier",
+      "availability": "coming_soon"
+    },
+    {
+      "id": "vb3qhC9U",
+      "tier": "typical",
+      "price": 399,
+      "title": "Investment Portfolio Tracker",
+      "format": "template_pack",
+      "summary": "Apne investments ko organize karne ke liye ek ready-to-use tracker.",
+      "disclaimer": "For learning only. Not investment advice.",
+      "tierReason": "A practical tool that provides ongoing value for tracking investments, justifying a typical tier.",
+      "whatYouGet": [
+        "Google Sheets portfolio tracker",
+        "Monthly budget and savings planner",
+        "Goal setting template for long-term growth"
+      ],
+      "description": "College mein hote hue investments manage karna mushkil ho sakta hai. Ye templates aapko apna chota-mota portfolio track karne aur monthly savings plan karne mein help karenge.",
+      "priceSource": "ai_tier",
+      "availability": "coming_soon"
+    },
+    {
+      "id": "yPsNKW_N",
+      "tier": "typical",
+      "price": 499,
+      "title": "Safe Investing Concepts Workshop",
+      "format": "live_workshop",
+      "summary": "Live session jahan hum safe investing ke concepts aur strategy discuss karenge.",
+      "disclaimer": "For learning only. Not investment advice.",
+      "tierReason": "A live interactive session allows for Q&A, providing more depth than static content.",
+      "whatYouGet": [
+        "90-minute live session on Zoom",
+        "Q&A session to clear your doubts",
+        "Access to the workshop recording"
+      ],
+      "description": "Ek 90-minute live session jahan hum basics se upar uthkar, safe investing strategies aur market concepts ko detail mein samjhenge. Apne doubts live clear karein.",
+      "priceSource": "ai_tier",
+      "availability": "coming_soon"
+    }
+  ],
+  "sensitiveDomain": "finance"
+}
+```
+</details>
+
+<details><summary>Fitness for new moms (#2)</summary>
+
+```json
+{
+  "theme": "teal",
+  "creator": {
+    "bio": "I help new mothers rebuild core strength and fitness through safe, short home workouts that fit around a baby's schedule.",
+    "headline": "Get strong again with short home workouts for new moms",
+    "displayName": "QA Eval Priya"
+  },
+  "language": "en",
+  "products": [
+    {
+      "id": "fJKIEP91",
+      "tier": "low",
+      "price": 149,
+      "title": "Postnatal Core Starter Guide",
+      "format": "ebook",
+      "summary": "Safe exercises to gently restart your fitness journey at home.",
+      "disclaimer": "For general wellness. Not medical advice.",
+      "tierReason": "A small, affordable entry-level guide to help new mothers begin core recovery safely.",
+      "whatYouGet": [
+        "PDF guide with core recovery exercises",
+        "Printable daily tracker sheet",
+        "Step-by-step posture correction checklist"
+      ],
+      "description": "This PDF guide is designed specifically for new moms who want to rebuild core strength after childbirth. Get safe, gentle routines that take just ten minutes a day.",
+      "priceSource": "ai_tier",
+      "availability": "coming_soon"
+    },
+    {
+      "id": "tk2xh3LZ",
+      "tier": "typical",
+      "price": 1499,
+      "title": "New Mom Home Workout Plan",
+      "format": "recorded_course",
+      "summary": "Step-by-step video workouts you can do at home with your baby.",
+      "disclaimer": "For general wellness. Not medical advice.",
+      "tierReason": "A complete video course offering structured guidance for sustained postnatal fitness.",
+      "whatYouGet": [
+        "15 follow-along video workout sessions",
+        "Weekly calendar and schedule planner",
+        "Access to private community discussion board"
+      ],
+      "description": "A comprehensive self-paced video series with 15 home workouts tailored for new mothers. Rebuild overall strength without needing expensive gym equipment or long hours away from your baby.",
+      "priceSource": "ai_tier",
+      "availability": "coming_soon"
+    },
+    {
+      "id": "WvliMJOs",
+      "tier": "high",
+      "price": 1999,
+      "title": "1-on-1 Postnatal Fitness Review",
+      "format": "one_on_one",
+      "summary": "Private video consultation to review your form and build a custom routine.",
+      "disclaimer": "For general wellness. Not medical advice.",
+      "tierReason": "A personalised video call giving direct attention and customized advice for your recovery.",
+      "whatYouGet": [
+        "45-minute 1-on-1 video call on Zoom",
+        "Customized weekly workout schedule",
+        "Direct chat support for two weeks after the call"
+      ],
+      "description": "A focused 45-minute video call where we discuss your recovery stage, check your exercise form, and create a personalized weekly routine that fits your daily routine.",
+      "priceSource": "ai_tier",
+      "availability": "coming_soon"
+    }
+  ],
+  "sensitiveDomain": "health"
+}
+```
+</details>
+
+<details><summary>UPSC, 100K+ (#4)</summary>
+
+```json
+{
+  "theme": "indigo",
+  "creator": {
+    "bio": "I help UPSC aspirants streamline their study process and master the syllabus with practical frameworks. I focus on breaking down complex exam requirements into manageable daily goals so you can prepare with confidence.",
+    "headline": "Simplify your UPSC preparation with a clear, actionable roadmap.",
+    "displayName": "QA Eval Rohan"
+  },
+  "language": "en",
+  "products": [
+    {
+      "id": "EKZhYqwU",
+      "tier": "low",
+      "price": 199,
+      "title": "UPSC Daily Study Tracker Template",
+      "format": "template_pack",
+      "summary": "A Notion-based tracker to organise your daily subjects and revision cycles.",
+      "tierReason": "This is a simple tool designed for quick setup and daily use.",
+      "whatYouGet": [
+        "Notion template for daily study tracking",
+        "Weekly revision schedule layout",
+        "PDF guide on how to use the tracker"
+      ],
+      "description": "Stop guessing what to study next. This template helps you map out your daily targets, track completion status, and log your revision hours so you stay consistent with your preparation.",
+      "priceSource": "ai_tier",
+      "availability": "coming_soon"
+    },
+    {
+      "id": "sFL2oFu5",
+      "tier": "typical",
+      "price": 499,
+      "title": "Mastering Answer Writing Workshop",
+      "format": "live_workshop",
+      "summary": "A 90-minute live session on structuring high-scoring answers for Mains.",
+      "tierReason": "The live interactive component provides value that warrants a solid tier.",
+      "whatYouGet": [
+        "90-minute live workshop recording",
+        "Checklist for effective answer structure",
+        "Two sample model answers for practice"
+      ],
+      "description": "Learn the exact framework to structure your answers for GS papers. We will break down how to write compelling introductions, body paragraphs, and conclusions under time pressure.",
+      "priceSource": "ai_tier",
+      "availability": "coming_soon"
+    },
+    {
+      "id": "_oYXkSw5",
+      "tier": "high",
+      "price": 7999,
+      "title": "UPSC Mains Strategy Cohort",
+      "format": "cohort_course",
+      "summary": "A 4-week intensive programme to refine your Mains strategy and syllabus coverage.",
+      "tierReason": "This is a premium, multi-week intensive programme with direct guidance.",
+      "whatYouGet": [
+        "Four weekly live group coaching calls",
+        "Access to a private peer discussion group",
+        "Structured 4-week syllabus completion plan"
+      ],
+      "description": "Join a focused group of aspirants to deep-dive into Mains preparation. We cover syllabus prioritisation, time management, and answer-writing discipline over four weeks of live sessions.",
+      "priceSource": "ai_tier",
+      "availability": "coming_soon"
+    }
+  ],
+  "sensitiveDomain": "none"
+}
+```
+</details>
+
+---
+
 Run finished at 2026-11-21 11:59 IST. Shutting down.

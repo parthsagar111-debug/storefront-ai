@@ -4,6 +4,36 @@ Per slice: what was built, problems hit, decisions made, how AI tools were used.
 
 ---
 
+## 🛠 QA fixes — Sat 21 Nov (tag `pre-qa-fixes` = state before; details in QA_REPORT §9)
+Deployed to production in 4 rounds (1–5 · A–F · 6–7 · 10); **core gate 43/43 after every deploy**.
+
+| Item | Fix | Commit | Verified |
+|---|---|---|---|
+| 0 | Key rotation | — | **skipped at Parth's request** (keys still the pre-QA ones; `.env.local` confirmed git-ignored and never committed) |
+| 1 | QA-01 functions in `hnd1` | `f9969c9` | yes (production `x-vercel-id: …::hnd1`) |
+| 2 | QA-02 Instagram URLs + field errors | `a325470` | yes (prod UI + API, unit tests) |
+| 3 | QA-04 long-text overflow | `ccd2735` | yes (60-char strings, 360 px, editor + public = 360) |
+| 4 | QA-05 products sorted by price (code-enforced) | `db2b281` | yes (unit tests) |
+| 5 | QA-06 `metadataBase` → absolute og:url | `c7dcde2` | yes (prod HTML) |
+| A | IQA-02 "Thanks!" only after 2xx | `b2a5511` | yes (prod: network error / 500 / success) |
+| B | IQA-01 + QA-08 `draft_rev`, changed-fields PATCH | `3fdb59b` | yes (prod: regenerate in tab A + bio in tab B both survive; 409 message) |
+| C | IQA-03 no third question round | `df3eea7` | yes (prod: round-2 answer → ready; unit tests) |
+| D | IQA-04 stale Why-₹ hidden after manual change | `8c7b9bf` | yes (prod UI) |
+| E | IQA-05 check final DB write | `a27b163` | yes (real generation with a stolen claim → no write, `generation_failed(claim_lost)`) |
+| F | IQA-06 letters in WhatsApp rejected | `1272254` | yes (prod API, unit tests) |
+| 6 | PROMPTS.md v2 → `prompts.ts` | `a451417` | yes (system prompt identical to v2, en + hinglish) |
+| 7 | QA-03/QA-10 `checkClaims` patterns | `047c199` | yes (29 unit tests; fired in the eval on "stock tips") |
+| 8 | Eval re-run (12 inputs, production) | — | 12/12 correct status; 0 rule violations; see below |
+| 9 | Delete `QA ` test data | — | yes: 60 stores + 310 events → 0 (13 older non-QA test stores left; not in scope) |
+| 10 | QA-07 blur messages · QA-09 beforeunload | `2d4e7ea` · `d0c8281` | yes (prod) |
+
+- **Latency (QA-01):** GET `/api/stores/<token>` median **1,747 → 416 ms**; tap → edit page **4.3 → 2.0 s**; tap → ready editor **8.8 → 5.4 s**.
+- **Eval:** no invented backstory or finance advice in any stored output (the new check rejected one primary attempt with "stock tips"; fallback fixed it). ebook + template pack + workshop now in **3/9** ok-stores (was 9/15). UPSC 100K+ now has a **₹7,999 cohort** step-up.
+- **Notes:** item C's final-round instruction is the only prompt text in code that isn't in PROMPTS v2. One Vercel GitHub webhook was missed (`047c199`); that deploy was created from the same commit via the Vercel API. Migration `0005_draft_rev` applied to the database. This phase used ~45 generation calls (3+ core gates, fix tests, 12-input eval).
+- **Model note (pending):** when Gemini billing is verified, set `GEMINI_MODEL=gemini-3.8-flash` (fallback `gemini-3.5-flash-lite`), redeploy, run 3 generations.
+
+---
+
 ## Code-enforced rules (added by QA fixes)
 - **Product order (QA-05):** after the ladder check, `buildStoreContent` sorts products by price ascending (equal prices keep the model's order). This applies to full generation and Regenerate all. A single-product regenerate keeps its slot and does not re-sort. Previously only a prompt instruction.
 
