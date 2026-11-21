@@ -8,11 +8,35 @@
 
 ## 0. Change log
 
+### v5 — three-way review (Claude, ChatGPT, Gemini; all items agreed YES by all three, 21 Nov)
+
+**V1. Input screen (replaces T30).** Headline "Turn what you know into a store in minutes." Subline "Tell us what you teach and who it's for. We'll suggest products and prices." Stacked full-width fields (no inputs inside a sentence) with labels that read as a sentence:
+1. "I'm" [name], required
+2. "I teach" [chips + free text], required
+3. "to" [audience chips that depend on the niche + free text; general chips if the niche is unknown; typed text is never overwritten when the niche changes], required
+4. "How many people follow you?" one tap, required
+5. Language English / Hinglish, visible, English default
+6. "More options" (collapsed): "What result do they get?" optional, niche-aware chips; Instagram handle optional, helper "Shown as a link on your store. We don't read your profile."
+CTA "Create my store". A missing result never triggers a follow-up.
+
+**V2. Prompt (PROMPTS v5).** Word targets instead of character targets (code trims at a word boundary when ≤ 15% over); tierReason never quotes "No audience yet"; needs_more only when BOTH expertise and audience are generic; niche examples kept but framed as illustrative; product regenerate keeps the whole set valid; optional creator hint passed as untrusted data.
+
+**V3. Generating and side states.** Skeleton shows the creator's name + one personalised status line (using their audience; no "pricing for N followers" claim). Indeterminate indicator replaces the 4-step bar. "Taking a little longer…" at 12s. Interrupted/stale → "Generation was interrupted. Try again." 200–300ms fade into the editor + one-time tip "Tap Edit on anything to change it". Follow-up: compact editable summary of what they teach / who it's for + "Edit my answers"; edits re-run the clarity check; never generate from thin input. Failure: no extra silent retry (the fallback model already retries); offline → "You're offline. Reconnect to continue." Unclear unchanged.
+
+**V4. Editor.** Everything current, plus: 10s "Regenerated. Undo" toast after any regenerate (restores format, price, availability); **Remove product** while more than 2 (entry-product rule still holds); optional "What should change?" hint on regenerate (bio or product); sheet + Save, no autosave; "Edit answers" relabelled **"Start over / Edit answers"** with a warning that manual edits will be replaced; changing format re-prices only if `priceSource` is still `ai_tier`, otherwise keeps the creator's price; Coming soon stays the default availability.
+
+**V5. Publish.** One sheet (replaces the separate steps): "Any of these ready to sell today?" toggles above (copy "Buyers will contact you on WhatsApp. Payments aren't collected on this store."), WhatsApp below, optional until a product is Available now, then required with the reason shown; the privacy line appears when the WhatsApp field is focused or filled; sticky Publish on mobile. Republish: one tap **"Update live store"** when nothing needs asking; never silently changes availability. Success screen only after the publish is confirmed saved and the public URL loads (otherwise keep the draft, offer Retry, no duplicate). Success screen: native share sheet when supported + Copy fallback + "Paste this link into your Instagram bio."; **"Save my private edit link on WhatsApp"** (wa.me prefilled to themselves; they send it) + Copy, with "Private: anyone with this link can edit your store. Don't forward it." Custom store-link names: roadmap.
+
+**V6. Public store.** Available-now products first (cheapest first), then a **"Coming soon"** subheading (cheapest first). Under "Enquire on WhatsApp": "Chat with <first name> to buy. No payment on this page." **No public interest counts** (counts only in the editor, labelled "interested taps"). Coming-soon cards: "Indicative price. Final price may change when available." WhatsApp prefill includes title + price, in the store's language. WhatsApp CTAs render only with a valid number. Disclaimers only when the domain applies. Initials avatar. Unobtrusive "Create your own store" footer.
+
+**V7. Price table.** §7.5 updated: live_workshop ₹199/399/799; one_on_one ₹299/699/1,499; community ₹99/199/399; others unchanged; evidence column added. Community is now entry-eligible at every tier.
+
 ### v4.5: additions from Parth's own testing
 
 | # | Change |
 |---|---|
 | T28 | **Edit answers & regenerate.** Editor top bar: **Edit answers**. Opens S1 prefilled with this store's input (name, 3 answers, audience size, language, Instagram) for the **same store/token**. Submit = confirmation ("This replaces your bio and all products. Your published page stays as it is until you publish again.") → generation runs with the new input, same pipeline and shared rate limit (T19). |
+| T30 | **Input screen (option D).** Order: name → Instagram (optional, visible) → what you teach (required) → who it's for (required, chips depend on the niche) → result (**optional**, chips depend on the niche) → followers → language. Subline: "Your name and 2 quick answers." A missing result never triggers a follow-up. Rejected alternatives: one free-text box (blank-page freeze, vaguer output) and handle-only (we don't read Instagram, so a handle alone gives the AI nothing). |
 | T29 | **Delete store.** Editor overflow menu: **Delete store**. Confirmation: "Delete this store? Its public page will stop working. This can't be undone." Server deletes the row (events cascade) after the token check; the device list drops it; the editor shows "Store deleted" + **Create a new store**. `/s/<slug>` then shows S6. Rate-limited like other writes. |
 
 ### v4.4 — final clarifications
@@ -400,20 +424,20 @@ No JSON-repair call and no third attempt; a fallback-model retry fixes the same 
 
 **Demo switch:** `FORCE_AI_FAIL=1` makes attempt 1 fail, to show the fallback; `FORCE_AI_FAIL=2` makes both fail, to show S2c.
 
-### 7.5 Pricing table (product assumptions, to be checked against evidence)
+### 7.5 Pricing table (v5, agreed by Claude, ChatGPT and Gemini; directional, not validated willingness to pay)
 
-| Format | Low | Typical | High | Range shown to creator | Entry-eligible tiers (≤ ₹499) |
-|---|---|---|---|---|---|
-| ebook | ₹149 | ₹299 | ₹499 | ₹149–₹499 | low, typical, high |
-| template_pack | ₹199 | ₹399 | ₹699 | ₹199–₹699 | low, typical |
-| recorded_course | ₹799 | ₹1,499 | ₹2,499 | ₹799–₹2,499 | none |
-| live_workshop | ₹299 | ₹499 | ₹999 | ₹299–₹999 | low, typical |
-| cohort_course | ₹2,499 | ₹4,999 | ₹7,999 | ₹2,499–₹7,999 | none |
-| one_on_one (per session) | ₹499 | ₹999 | ₹1,999 | ₹499–₹1,999 | low |
-| community (per month) | ₹149 | ₹299 | ₹599 | ₹149–₹599 | low, typical |
+| Format | Low | Typical | High | Range shown to creator | Entry-eligible tiers (≤ ₹499) | Evidence |
+|---|---|---|---|---|---|---|
+| ebook | ₹149 | ₹299 | ₹499 | ₹149–₹499 | low, typical, high | Supported: SuperProfile ebook pages at ₹149 and ₹299 |
+| template_pack | ₹199 | ₹399 | ₹699 | ₹199–₹699 | low, typical | None found (hypothesis) |
+| recorded_course | ₹799 | ₹1,499 | ₹2,499 | ₹799–₹2,499 | none | None found (hypothesis) |
+| live_workshop | ₹199 | ₹399 | ₹799 | ₹199–₹799 | low, typical | Partial: Topmate webinar median ₹259 (a webinar isn't identical to a 60–120 min workshop) |
+| cohort_course | ₹2,499 | ₹4,999 | ₹7,999 | ₹2,499–₹7,999 | none | Supported: Indian live cohorts at ₹4,999, ₹5,999, ₹6,999 |
+| one_on_one (per session) | ₹299 | ₹699 | ₹1,499 | ₹299–₹1,499 | low | Strong: Topmate paid bookings Nov 2025–Oct 2026, 1:1 middle half ₹259–₹1,106; medians ₹510 (data science), ₹709 (PM); creator coaches ₹1,800 |
+| community (per month) | ₹99 | ₹199 | ₹399 | ₹99–₹399 | low, typical, high | Weakest (hypothesis) |
 
 - All prices are Indian "charm" points ending in 49 / 99.
-- **Evidence task (before submission, Claude chat):** collect ~20 real Indian creator offers across these formats (SuperProfile, Topmate, Graphy, Instamojo and similar stores), record price, format and niche, and adjust the table if the evidence disagrees. The table and its sources go in the decision doc, labelled honestly: **observed list prices, directional only** (we don't know sales volume, the creator's audience size or discounts). It is not validated willingness to pay; that needs live price tests (two-week roadmap). The tiers explain when a higher price is reasonable.
+- **Decision-doc wording (agreed):** prices are deterministic starting recommendations, not AI-generated amounts or validated willingness to pay. Directional bands triangulated from Topmate paid-booking data, observed SuperProfile ebook listings and published cohort prices; these differ in transaction type, creator expertise and audience. Evidence strength is stated per format. Creators can override every price. Real willingness to pay needs live price tests (two-week roadmap). The tiers explain when a higher price is reasonable.
 
 ## 8. Edge cases (acceptance tests)
 
