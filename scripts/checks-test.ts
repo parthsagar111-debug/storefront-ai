@@ -1,5 +1,5 @@
 // Unit checks for the deterministic rules (SPEC §7.4). Run: npx tsx --conditions=react-server scripts/checks-test.ts
-import { scrubTierReason, checkClaims, sensitiveDomain, enforceLadder, toStoredProduct, checkDistinct, acceptProduct, buildStoreContent, acceptGeneration, fitTierReason, parseGeneration, fitText, normalizeModelOutput } from "../src/lib/ai/build-store";
+import { scrubTierReason, checkClaims, sensitiveDomain, enforceLadder, toStoredProduct, checkDistinct, acceptProduct, buildStoreContent, acceptGeneration, fitTierReason, parseGeneration, fitText, normalizeModelOutput, rewriteAudienceLabels } from "../src/lib/ai/build-store";
 import { generationUserPrompt } from "../src/lib/ai/prompts";
 import { normalizeIndianMobile, waText, waLink } from "../src/lib/whatsapp";
 import { parseInstagram } from "../src/lib/instagram";
@@ -194,4 +194,18 @@ for (const txt of ["No stock tips, only concepts.", "We don't give buy/sell call
   t(`finance negated allowed: "${txt}"`, txt === "Koi stock tips nahi" ? throws(() => checkClaims([txt], input({ expertise: "Stock market basics" }), "finance")) : !throws(() => checkClaims([txt], input({ expertise: "Stock market basics" }), "finance")));
 for (const txt of ["Daily stock tips for you", "Get stock tips and multibaggers", "Invest your business savings safely", "No jargon, just safe stocks"])
   t(`finance still blocked: "${txt}"`, throws(() => checkClaims([txt], input({ expertise: "Stock market basics" }), "finance")));
+// Round 4 item 2: raw audience labels in price reasons are rewritten
+for (const [inp, want] of [
+  ["With no audience yet, a small template pack makes it easy to buy.", "As a new creator, a small template pack makes it easy to buy."],
+  ["A low price works because you have no audience yet.", "A low price works because you are a new creator."],
+  ["With Under 5K followers, start low.", "With a small, early following, start low."],
+  ["Priced low for an audience under 5k.", "Priced low for a small, early following."],
+  ["With 5K–20K followers, this core product fits.", "With a growing following, this core product fits."],
+  ["with 5k-20k this works", "with a growing following this works"],
+  ["With 20K–100K followers, a premium tier works.", "With an established following, a premium tier works."],
+  ["With 100K+ followers, a cohort fits.", "With an established following, a cohort fits."],
+  ["Fits the creator's audience size and depth.", "Fits your audience and depth."],
+  ["A light guide for working professionals.", "A light guide for working professionals."],
+] as const) t(`labels: "${inp.slice(0, 40)}"`, rewriteAudienceLabels(inp) === want, rewriteAudienceLabels(inp));
+t("labels: stored product gets the rewrite", toStoredProduct({ ...mp("ebook", "low"), tierReason: "With no audience yet, start small." }, "none").tierReason === "As a new creator, start small.");
 console.log(fail ? `${fail} FAILED` : "ALL PASSED"); process.exit(fail ? 1 : 0);

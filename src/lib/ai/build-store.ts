@@ -172,11 +172,38 @@ export const DISCLAIMER: Record<Domain, string | undefined> = {
 
 const productTexts = (p: TModelProduct) => [p.title, p.summary, p.description, p.tierReason, ...p.whatYouGet];
 
+/**
+ * Round 4 item 2: price reasons never quote a raw follower label. Each label (with or without "with" / "followers")
+ * becomes natural words; "the creator's audience size" becomes "your audience". Capitalised at a sentence start.
+ */
+const LABEL_REWRITES: [RegExp, string][] = [
+  [/\bhave no audience yet\b/gi, "are a new creator"],
+  [/\bhas no audience yet\b/gi, "is a new creator"],
+  [/\b(?:with\s+)?(?:an?\s+)?(?:audience\s+(?:size\s+)?(?:of\s+)?)?no audience yet\b/gi, "as a new creator"],
+  [/\b(?:with\s+)?(?:an?\s+)?(?:audience\s+(?:size\s+)?(?:of\s+)?)?20\s*k\s*[–—-]\s*100\s*k(?:\s+followers)?/gi, "with an established following"],
+  [/\b(?:with\s+)?(?:an?\s+)?(?:audience\s+(?:size\s+)?(?:of\s+)?)?100\s*k\s*\+(?:\s+followers)?/gi, "with an established following"],
+  [/\b(?:with\s+)?(?:an?\s+)?(?:audience\s+(?:size\s+)?(?:of\s+)?)?5\s*k\s*[–—-]\s*20\s*k(?:\s+followers)?/gi, "with a growing following"],
+  [/\b(?:with\s+)?(?:an?\s+)?(?:audience\s+(?:size\s+)?(?:of\s+)?)?under\s*5\s*k(?:\s+followers)?\b/gi, "with a small, early following"],
+  [/\bthe creator(?:'|’)s audience size\b/gi, "your audience"],
+];
+export function rewriteAudienceLabels(reason: string): string {
+  let out = reason;
+  for (const [re, words] of LABEL_REWRITES)
+    out = out.replace(re, (m: string, offset: number, whole: string) => {
+      // After a preposition, "with a … following" reads as "for a … following".
+      const prev = whole.slice(0, offset).match(/(\w+)\s*$/)?.[1]?.toLowerCase();
+      let w = prev && ["for", "to", "at", "of", "on"].includes(prev) && words.startsWith("with ") ? words.slice(5) : words;
+      if (/^[A-Z]/.test(m)) w = w[0].toUpperCase() + w.slice(1); // keep the original capitalisation
+      return w;
+    });
+  return out.replace(/\s{2,}/g, " ");
+}
+
 /** Model product → stored product: new id, scrubbed reason, table price, coming soon, disclaimer. */
 export function toStoredProduct(p: TModelProduct, domain: Domain): TProduct {
   return {
     ...p,
-    tierReason: scrubTierReason(p.tierReason),
+    tierReason: rewriteAudienceLabels(scrubTierReason(p.tierReason)),
     id: newProductId(),
     price: priceFor(p.format, p.tier),
     priceSource: "ai_tier",
