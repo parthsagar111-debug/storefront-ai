@@ -119,6 +119,10 @@ export const FINANCE_ADVICE_PATTERNS: RegExp[] = [
   /\b(invest|investing|investments?|stocks?|returns)\b(?:\W+\w+){0,4}?\W+(safe|safely|risk[- ]free|secure|guaranteed)\b/i,
 ];
 
+/** A negation shortly before a finance-advice phrase in the same clause: "no stock tips", "we don't give buy/sell calls or stock tips". */
+/** Scope = same clause (no , . ; : ! ? in between), up to 6 words back. */
+const NEGATION_BEFORE = /\b(no|not|never|without|zero|don'?t|do not|won'?t|isn'?t|aren'?t|bina)\b(?:[^\w,.;:!?]+[\w/'-]+){0,6}[^\w,.;:!?]*$/i;
+
 export function checkClaims(texts: string[], input: StoreInput, domain: Domain = "none") {
   const all = texts.join("\n");
   const src = inputText(input);
@@ -130,8 +134,13 @@ export function checkClaims(texts: string[], input: StoreInput, domain: Domain =
   }
   if (domain === "finance") {
     for (const re of FINANCE_ADVICE_PATTERNS) {
-      const m = all.match(re);
-      if (m) throw new CheckFailed(`finance advice: "${m[0]}"`);
+      const g = new RegExp(re.source, re.flags.includes("g") ? re.flags : re.flags + "g");
+      for (const m of all.matchAll(g)) {
+        // Round 3 eval: "no stock tips" / "without buy-sell calls" promise the opposite of advice → allowed.
+        const before = all.slice(Math.max(0, m.index! - 40), m.index).toLowerCase();
+        if (NEGATION_BEFORE.test(before)) continue;
+        throw new CheckFailed(`finance advice: "${m[0]}"`);
+      }
     }
   }
   const rules: [string, RegExp, boolean][] = [

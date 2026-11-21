@@ -189,4 +189,9 @@ t("wa ask en", waText("ask", "Ananya", "Tiffin Plan", 299, "en") === 'Hi Ananya,
 t("wa buy hinglish", waText("buy", "Ananya", "Tiffin Plan", 1499, "hinglish") === 'Hi Ananya, mujhe "Tiffin Plan" (₹1,499) lena hai.');
 t("wa ask hinglish", waText("ask", "Ananya", "Tiffin Plan", 299, "hinglish") === 'Hi Ananya, "Tiffin Plan" (₹299) ke baare mein ek sawaal hai.');
 t("wa link encodes text + 91", waLink("9876543210", "A", "T", 199).startsWith("https://wa.me/919876543210?text=Hi%20A"));
+// Round 3 eval finding: negated advice phrases are not advice
+for (const txt of ["No stock tips, only concepts.", "We don't give buy/sell calls or stock tips", "Learn the basics without stock tips", "Koi stock tips nahi"])
+  t(`finance negated allowed: "${txt}"`, txt === "Koi stock tips nahi" ? throws(() => checkClaims([txt], input({ expertise: "Stock market basics" }), "finance")) : !throws(() => checkClaims([txt], input({ expertise: "Stock market basics" }), "finance")));
+for (const txt of ["Daily stock tips for you", "Get stock tips and multibaggers", "Invest your business savings safely", "No jargon, just safe stocks"])
+  t(`finance still blocked: "${txt}"`, throws(() => checkClaims([txt], input({ expertise: "Stock market basics" }), "finance")));
 console.log(fail ? `${fail} FAILED` : "ALL PASSED"); process.exit(fail ? 1 : 0);
