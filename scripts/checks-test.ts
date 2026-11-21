@@ -65,7 +65,7 @@ t("ladder: course + cohort fails", throws(() => enforceLadder([toStoredProduct(m
   t("rounds: needs_more on the final round fails the attempt", throws(() => acceptGeneration(nm, input({ direction: "fitness" }), null, true)));
   t("rounds: unclear on the final round is still allowed", acceptGeneration({ status: "unclear", reason: "x" }, input(), null, true).kind === "unclear");
   const ci = { name: "A", expertise: "fitness", audience: "people", outcome: "fit", audienceSize: "Under 5K followers", language: "en" as const, direction: "Strength for beginners" };
-  t("rounds: final-round prompt forbids needs_more", /Do NOT return needs_more: return status "ok"/.test(generationUserPrompt(ci, undefined, { finalRound: true })));
+  t("rounds: final-round prompt forbids needs_more", /This is the last clarification round\. You must return status "ok" using the chosen direction; do not return needs_more\./.test(generationUserPrompt(ci, undefined, { finalRound: true })));
   t("rounds: earlier rounds keep the normal instruction", /Only return needs_more if the input is still impossible/.test(generationUserPrompt(ci)));
 }
 // IQA-06 WhatsApp: letters rejected before normalising; separators allowed

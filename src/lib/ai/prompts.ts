@@ -1,4 +1,4 @@
-// PROMPTS.md v2 — text used as written. {{...}} values inserted by code. Never insert rupee numbers.
+// PROMPTS.md v3 — text used as written. {{...}} values inserted by code. Never insert rupee numbers.
 
 export type Language = "en" | "hinglish";
 
@@ -18,7 +18,8 @@ export const truncate = (s: string | undefined) => (s ?? "").slice(0, MAX_FIELD)
 
 const LANGUAGE_BLOCK: Record<Language, string> = {
   en: `Write everything in simple, clear Indian English. Short sentences.`,
-  hinglish: `Write the headline, bio, summaries, descriptions and whatYouGet in Hinglish: Hindi and English mixed naturally in Roman script, the way urban Indian creators write on Instagram. Example tone: "Roz ka khana, bas 20 minute mein. Simple recipes jo office ke baad bhi ban jaayein." Product titles can stay mostly English. tierReason stays in simple English (only the creator sees it). Do not use Devanagari script.`,
+  hinglish: `Hindi verbs change with gender. Use the creator's gender only if it is clear from the name; keep it consistent in every sentence. If it is unclear, rephrase to avoid gendered verbs: "Mere saath aap seekhenge…" or "Mera focus hai…" instead of "main sikhata/sikhati hoon".
+Write the headline, bio, summaries, descriptions and whatYouGet in Hinglish: Hindi and English mixed naturally in Roman script, the way urban Indian creators write on Instagram. Example tone: "Roz ka khana, bas 20 minute mein. Simple recipes jo office ke baad bhi ban jaayein." Product titles can stay mostly English. tierReason stays in simple English (only the creator sees it). Do not use Devanagari script.`,
 };
 
 export function systemPrompt(language: Language): string {
@@ -58,8 +59,8 @@ Weigh: how deep the product is, how much live time it costs the creator, how spe
 - title: 4 to 60 characters, specific, no clickbait.
 - summary: one line, up to 90 characters, the main promise of the product.
 - description: 40 to 420 characters. Who it is for, what they get, what changes for them.
-- whatYouGet: exactly 3 items, each a real deliverable the buyer receives (for example "PDF with 30 recipes", "2-hour live session on Zoom", "Weekly grocery list template").
-- tierReason: one or two plain sentences explaining why this tier fits. Never write a price, the ₹ symbol, "Rs" or any number with 3 or more digits.
+- whatYouGet: exactly 3 items, each a real deliverable the buyer receives (for example "PDF with 30 recipes", "2-hour live session on Zoom", "Weekly grocery list template"). For live formats, the first item is the live session itself (with its length), not only the recording.
+- tierReason: one or two plain sentences explaining why this tier fits **this creator's audience and this product**. Mention who the buyer is (for example college students, new moms, working professionals) and what makes the product light or deep (length, live time, personal attention). Never generic lines like "an affordable entry-level guide". Never write a price, the ₹ symbol, "Rs" or any number with 3 or more digits.
 - headline: 8 to 70 characters, what the creator helps people do.
 - bio: 60 to 320 characters, first person, warm and specific. It should sound like a real person talking, not an advert. Avoid "passionate", "journey", "unlock your potential" and similar clichés.
 
@@ -69,6 +70,7 @@ Weigh: how deep the product is, how much live time it costs the creator, how spe
 - Never promise results: no "guaranteed", no "100%", no specific weight-loss, income or exam-score numbers.
 - Finance topics: education only. No stock tips, buy or sell calls, portfolio advice, return figures, or claims of SEBI registration unless the input says so. Set sensitiveDomain to "finance".
   - Never offer portfolio reviews or audits, feedback on someone's stocks or holdings, "which stock to buy", "safe stocks", "multibaggers" or any personalised investment recommendation, including in 1:1 calls.
+  - Never call an investment, a stock or a strategy "safe", "risk-free", "secure" or "guaranteed", and don't promise to invest "safely". Say "carefully", "step by step" or "with a clear plan" instead.
   - Offer concepts, processes and tools instead: how markets work, how to read a balance sheet, how to build a budget or an SIP plan, how to research a company, a 1:1 call to clear doubts about concepts or to make a learning plan.
 - Health, fitness, diet, sleep, hormonal or mental-health topics: no diagnosing or treating conditions and no medical claims. Set sensitiveDomain to "health".
 - Otherwise set sensitiveDomain to "none".
@@ -103,11 +105,10 @@ ${creatorBlock(i, { audienceSize: true, directionLabel: "Direction chosen by the
 First decide if there is enough to work with:
 - status "unclear": the input is gibberish, offensive, unsafe, or does not describe a skill or a person who helps others. Put a short, friendly reason in "reason".
 - status "needs_more": it is a real skill but too broad or vague to choose products (for example "fitness" for "people"). Ask ONE short question in "question" and give exactly 3 "directions": specific, different niches this creator might mean, each under 60 characters (for example "Home workouts for new moms").${
-    i.direction
-      ? opts.finalRound
-        ? `\n  The creator has already answered the follow-up question twice. Do NOT return needs_more: return status "ok" and build the store around the chosen direction.`
-        : `\n  The creator has already chosen a direction. Only return needs_more if the input is still impossible to work with.`
-      : ""
+    i.direction ? `\n  The creator has already chosen a direction. Only return needs_more if the input is still impossible to work with.` : ""
+  }${
+    // QA item C (now in PROMPTS v3): after the last allowed follow-up round the model must return "ok".
+    opts.finalRound ? `\n  This is the last clarification round. You must return status "ok" using the chosen direction; do not return needs_more.` : ""
   }
 - status "ok": write the headline, bio, sensitiveDomain and 2 to 4 products.`;
   if (currentStoreJson) {
