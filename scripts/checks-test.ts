@@ -1,5 +1,5 @@
 // Unit checks for the deterministic rules (SPEC §7.4). Run: npx tsx --conditions=react-server scripts/checks-test.ts
-import { scrubTierReason, checkClaims, sensitiveDomain, enforceLadder, toStoredProduct, checkDistinct, acceptProduct, buildStoreContent, acceptGeneration } from "../src/lib/ai/build-store";
+import { scrubTierReason, checkClaims, sensitiveDomain, enforceLadder, toStoredProduct, checkDistinct, acceptProduct, buildStoreContent, acceptGeneration, fitTierReason, parseGeneration } from "../src/lib/ai/build-store";
 import { generationUserPrompt } from "../src/lib/ai/prompts";
 import { normalizeIndianMobile } from "../src/lib/whatsapp";
 import { parseInstagram } from "../src/lib/instagram";
@@ -103,6 +103,19 @@ for (const txt of ["Invest carefully, step by step, with a clear plan", "A safe 
   t(`finance safe-wording allowed: "${txt}"`, !throws(() => checkClaims([txt], input({ expertise: "Stock market basics" }), "finance")));
 t("safe-wording check inactive outside finance", !throws(() => checkClaims(["A safe home workout to invest 20 minutes in yourself"], input({ expertise: "Fitness" }), "health")));
 t("finance patterns inactive outside finance", !throws(() => checkClaims(["Portfolio review of your design work"], input({ expertise: "Graphic design" }), "none")));
+// Round 2: PROMPTS v3 tierReasons longer than SPEC's 160 chars are trimmed, not rejected
+{
+  const short = "A light starter guide for college students who are new to investing.";
+  t("tierReason: short unchanged", fitTierReason(short) === short);
+  const two = "A short PDF for college students who have never invested before and want the basics first. It is light reading that they can finish in one evening before class starts.";
+  t("tierReason: keeps whole sentences ≤ 160", fitTierReason(two) === "A short PDF for college students who have never invested before and want the basics first." && fitTierReason(two).length <= 160, fitTierReason(two));
+  const one = "This is a single very long sentence written for working professionals who cook after office hours and want a deeper weekly plan with shopping lists and prep timings and swaps";
+  const f = fitTierReason(one);
+  t("tierReason: one long sentence cut at a word with …", f.length <= 160 && f.endsWith("…") && one.startsWith(f.slice(0, -1)), `${f.length}: ${f}`);
+  const raw = { status: "ok", headline: "Headline here", bio: "b".repeat(80), sensitiveDomain: "none",
+    products: [{ ...mp("ebook", "low", "a"), tierReason: two + " " + two }, mp("template_pack", "low", "b")] };
+  t("tierReason: generation with a 300+ char reason parses", !throws(() => parseGeneration(raw)));
+}
 // QA-02 Instagram parsing
 for (const [raw, want] of [
   ["https://instagram.com/qa.handle", "qa.handle"], ["https://www.instagram.com/qa_handle/", "qa_handle"],

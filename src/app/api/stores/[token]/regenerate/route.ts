@@ -12,7 +12,7 @@ import {
 } from "@/lib/ai/schemas";
 import { BioResultSchema, ProductResultSchema, GenerationResultUnionSchema } from "@/lib/ai/response-schemas";
 import { systemPrompt, bioUserPrompt, productUserPrompt, generationUserPrompt } from "@/lib/ai/prompts";
-import { parseGeneration, buildStoreContent, acceptBio, acceptProduct } from "@/lib/ai/build-store";
+import { parseGeneration, buildStoreContent, acceptBio, acceptProduct, normalizeModelOutput } from "@/lib/ai/build-store";
 import { CheckFailed } from "@/lib/ai/pipeline";
 import { ENTRY_MAX } from "@/lib/pricing";
 
@@ -83,7 +83,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/stores/[token]/
       user: productUserPrompt(ci, current, target.title, others.map((p) => p.format), mustBeEntry),
       schema: ProductResultSchema,
       accept: (raw) => {
-        const r = ProductResult.safeParse(raw);
+        const r = ProductResult.safeParse(normalizeModelOutput(raw));
         if (!r.success) throw new CheckFailed("zod: " + r.error.message.slice(0, 300));
         acceptProduct(r.data.product, input, draft, productId); // checks → fallback model on failure
         return r.data.product;

@@ -15,8 +15,39 @@ type Ok = Extract<import("./schemas").TGenerationResult, { status: "ok" }>;
 type Domain = TStoreContent["sensitiveDomain"];
 
 /** Parse the model's JSON into the Zod union (flat or union shape both accepted). */
+/** SPEC §7.2 caps tierReason at 160 chars; PROMPTS v3 asks for richer reasons, which models often write longer. */
+export const TIER_REASON_MAX = 160;
+
+/** Keep the whole sentences that fit in 160 chars; if even the first doesn't fit, cut at a word boundary with "…". */
+export function fitTierReason(reason: string): string {
+  const s = reason.trim().replace(/\s+/g, " ");
+  if (s.length <= TIER_REASON_MAX) return s;
+  let out = "";
+  for (const sentence of s.split(/(?<=[.!?])\s+/)) {
+    const next = out ? `${out} ${sentence}` : sentence;
+    if (next.length > TIER_REASON_MAX) break;
+    out = next;
+  }
+  if (out) return out;
+  const cut = s.slice(0, TIER_REASON_MAX - 1);
+  return cut.slice(0, Math.max(cut.lastIndexOf(" "), 1)).replace(/[\s,;:–-]+$/, "") + "…";
+}
+
+/** Normalise model output before Zod: over-long tierReasons are trimmed (full generation and single product). */
+export function normalizeModelOutput(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object") return raw;
+  const fix = (p: unknown) => {
+    if (p && typeof p === "object" && typeof (p as { tierReason?: unknown }).tierReason === "string")
+      (p as { tierReason: string }).tierReason = fitTierReason((p as { tierReason: string }).tierReason);
+  };
+  const r = raw as { products?: unknown; product?: unknown };
+  if (Array.isArray(r.products)) r.products.forEach(fix);
+  fix(r.product);
+  return raw;
+}
+
 export function parseGeneration(raw: unknown) {
-  const r = GenerationResult.safeParse(normalizeFlat(raw));
+  const r = GenerationResult.safeParse(normalizeFlat(normalizeModelOutput(raw)));
   if (!r.success) throw new CheckFailed("zod: " + r.error.message.slice(0, 400));
   return r.data;
 }
