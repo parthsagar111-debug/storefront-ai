@@ -38,7 +38,7 @@ export async function runGeneration(storeId: string, preClaimed?: StoreRow): Pro
     system: systemPrompt(input.language),
     user: generationUserPrompt(toCreatorInput(input), undefined, { finalRound }),
     schema: GenerationResultUnionSchema,
-    accept: (raw) => acceptGeneration(raw, input, store.draft, finalRound),
+    accept: (raw, { primary }) => acceptGeneration(raw, input, store.draft, finalRound, primary),
   });
 
   // Only the run that still holds the claim may write (guards against a stale run finishing late).
@@ -85,6 +85,13 @@ export async function runGeneration(storeId: string, preClaimed?: StoreRow): Pro
     const w = await finish({ status: "needs_input", follow_up, model_used: model });
     if (w !== "written") return writeFailed(w, { model, attempts, latencyMs, outcome: value.kind });
     if (value.kind === "needs_more") await logEvent(storeId, "followup_shown", { round: follow_up.kind === "needs_more" ? follow_up.round : 0 });
-    await logEvent(storeId, "generation_completed", { model, attempts, latencyMs, outcome: value.kind });
+    await logEvent(storeId, "generation_completed", {
+      model,
+      attempts,
+      latencyMs,
+      outcome: value.kind,
+      // Round 4 item 3: primary fires show up as a failed attempt "generic tier reasons…"; this marks the kept ones.
+      ...(value.kind === "ok" ? { genericReasonsKept: Boolean(value.genericReasons) } : {}),
+    });
   }
 }

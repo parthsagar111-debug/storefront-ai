@@ -12,7 +12,7 @@ import {
 } from "@/lib/ai/schemas";
 import { BioResultSchema, ProductResultSchema, GenerationResultUnionSchema } from "@/lib/ai/response-schemas";
 import { systemPrompt, bioUserPrompt, productUserPrompt, generationUserPrompt } from "@/lib/ai/prompts";
-import { parseGeneration, buildStoreContent, acceptBio, acceptProduct, normalizeModelOutput } from "@/lib/ai/build-store";
+import { parseGeneration, buildStoreContent, acceptBio, acceptProduct, normalizeModelOutput, checkBuyerInReasons } from "@/lib/ai/build-store";
 import { CheckFailed } from "@/lib/ai/pipeline";
 import { ENTRY_MAX } from "@/lib/pricing";
 import { HINT_MAX } from "@/lib/ai/prompts";
@@ -113,10 +113,11 @@ export async function POST(req: Request, ctx: RouteContext<"/api/stores/[token]/
       system,
       user: generationUserPrompt(ci, current),
       schema: GenerationResultUnionSchema,
-      accept: (raw) => {
+      accept: (raw, { primary }) => {
         const r = parseGeneration(raw);
         if (r.status === "ok") {
           buildStoreContent(r, input, draft); // checks → fallback model on failure
+          checkBuyerInReasons(r.products, input, primary, "regenerate all");
           return { ok: r };
         }
         return { message: r.status === "needs_more" ? r.question : r.reason };

@@ -290,11 +290,33 @@ export function acceptProduct(p: TModelProduct, input: StoreInput, store: TStore
   return next;
 }
 
+/**
+ * Round 4 item 3: does any tierReason mention the buyer — the audience text, or a word from it longer than 3 letters
+ * (a trailing plural "s" ignored)? Generic reasons fail the PRIMARY attempt only (→ fallback); the fallback's answer
+ * is accepted either way (a store never fails over this). Each fire is logged.
+ */
+const NOT_BUYER_WORDS = new Set(["with", "from", "that", "their", "them", "they", "into", "about", "want", "wants", "your", "this", "those", "these", "who", "like"]);
+export function reasonsMentionBuyer(reasons: string[], audience: string): boolean {
+  const text = reasons.join(" ").toLowerCase();
+  const aud = audience.trim().toLowerCase();
+  if (aud && text.includes(aud)) return true;
+  const words = (aud.match(/[a-z\u00C0-\u024F]+/g) ?? []).filter((w) => w.length > 3 && !NOT_BUYER_WORDS.has(w));
+  return words.some((w) => new RegExp(`\\b${w.replace(/s$/, "")}`, "i").test(text));
+}
+export function checkBuyerInReasons(products: Pick<TModelProduct, "tierReason">[], input: StoreInput, primary: boolean, label = "generation") {
+  if (reasonsMentionBuyer(products.map((p) => p.tierReason), input.audience)) return;
+  if (primary) {
+    console.warn(`[checks] generic tierReasons on primary (${label}) → fallback`);
+    throw new CheckFailed("generic tier reasons: none mention the buyer");
+  }
+  console.warn(`[checks] generic tierReasons accepted on fallback (${label})`);
+}
+
 /** S2b: at most this many clarification rounds; after the last one, generation must return "ok". */
 export const MAX_FOLLOW_UP_ROUNDS = 2;
 
 export type GenOutcome =
-  | { kind: "ok"; content: TStoreContent }
+  | { kind: "ok"; content: TStoreContent; genericReasons?: boolean }
   | { kind: "needs_more"; question: string; directions: string[] }
   | { kind: "unclear"; reason: string };
 
@@ -302,9 +324,14 @@ export type GenOutcome =
  * Full-generation accept step. IQA-03: on the final round (`finalRound`), a needs_more answer is a failed
  * attempt (→ fallback model → Retry state), so a third question screen can never appear.
  */
-export function acceptGeneration(raw: unknown, input: StoreInput, existing: TStoreContent | null, finalRound: boolean): GenOutcome {
+export function acceptGeneration(raw: unknown, input: StoreInput, existing: TStoreContent | null, finalRound: boolean, primary = false): GenOutcome {
   const r = parseGeneration(raw);
-  if (r.status === "ok") return { kind: "ok", content: buildStoreContent(r, input, existing) };
+  if (r.status === "ok") {
+    const content = buildStoreContent(r, input, existing);
+    checkBuyerInReasons(r.products, input, primary);
+    // Logged in the generation_completed event (round 4 item 3: how often the fallback's generic reasons are kept).
+    return { kind: "ok", content, genericReasons: !reasonsMentionBuyer(r.products.map((p) => p.tierReason), input.audience) };
+  }
   if (r.status === "needs_more") {
     if (finalRound) throw new CheckFailed("needs_more after the last allowed follow-up round");
     return { kind: "needs_more", question: r.question, directions: r.directions };

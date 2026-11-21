@@ -28,8 +28,8 @@ export async function runWithFallback<T>(opts: {
   system: string;
   user: string;
   schema: Schema;
-  /** Parse + validate + deterministic checks. Throw to fail the attempt. */
-  accept: (raw: unknown) => T;
+  /** Parse + validate + deterministic checks. Throw to fail the attempt. `primary` = attempt 1 (round 4 item 3). */
+  accept: (raw: unknown, ctx: { primary: boolean }) => T;
   label: string;
 }): Promise<{ ok: true; result: PipelineResult<T> } | { ok: false; attempts: AttemptLog[]; latencyMs: number }> {
   const t0 = Date.now();
@@ -54,7 +54,7 @@ export async function runWithFallback<T>(opts: {
     try {
       if (forceFail >= i + 1) throw new Error(`FORCE_AI_FAIL=${forceFail}`);
       text = await callModel({ model: step.model, system: opts.system, user: opts.user, schema: opts.schema, timeoutMs });
-      const value = opts.accept(JSON.parse(text));
+      const value = opts.accept(JSON.parse(text), { primary: i === 0 });
       attempts.push({ model: step.model, ms: Date.now() - a0, ok: true });
       console.log(`[ai] ${opts.label} ok`, JSON.stringify({ model: step.model, attempts }));
       return { ok: true, result: { value, model: step.model, attempts, latencyMs: Date.now() - t0 } };

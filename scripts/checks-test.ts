@@ -1,5 +1,5 @@
 // Unit checks for the deterministic rules (SPEC §7.4). Run: npx tsx --conditions=react-server scripts/checks-test.ts
-import { scrubTierReason, checkClaims, sensitiveDomain, enforceLadder, toStoredProduct, checkDistinct, acceptProduct, buildStoreContent, acceptGeneration, fitTierReason, parseGeneration, fitText, normalizeModelOutput, rewriteAudienceLabels } from "../src/lib/ai/build-store";
+import { scrubTierReason, checkClaims, sensitiveDomain, enforceLadder, toStoredProduct, checkDistinct, acceptProduct, buildStoreContent, acceptGeneration, fitTierReason, parseGeneration, fitText, normalizeModelOutput, rewriteAudienceLabels, reasonsMentionBuyer, checkBuyerInReasons } from "../src/lib/ai/build-store";
 import { generationUserPrompt } from "../src/lib/ai/prompts";
 import { normalizeIndianMobile, waText, waLink } from "../src/lib/whatsapp";
 import { parseInstagram } from "../src/lib/instagram";
@@ -208,4 +208,17 @@ for (const [inp, want] of [
   ["A light guide for working professionals.", "A light guide for working professionals."],
 ] as const) t(`labels: "${inp.slice(0, 40)}"`, rewriteAudienceLabels(inp) === want, rewriteAudienceLabels(inp));
 t("labels: stored product gets the rewrite", toStoredProduct({ ...mp("ebook", "low"), tierReason: "With no audience yet, start small." }, "none").tierReason === "As a new creator, start small.");
+// Round 4 item 3: generic price reasons fail the primary attempt only
+t("buyer: audience word found", reasonsMentionBuyer(["A light guide for working people.", "Deep."], "Working professionals"));
+t("buyer: plural ignored (fresher ← freshers)", reasonsMentionBuyer(["Built for a fresher's first job hunt."], "Freshers looking for their first job"));
+t("buyer: full audience text", reasonsMentionBuyer(["Great for small business owners."], "Small business owners"));
+t("buyer: generic reasons → false", !reasonsMentionBuyer(["A low price point is perfect for followers.", "Better value for the audience."], "Working professionals"));
+t("buyer: short words (≤ 3 letters) don't count", !reasonsMentionBuyer(["Good for new users."], "New moms"));
+t("buyer: primary throws", throws(() => checkBuyerInReasons([{ tierReason: "A low price is easy." }], input({ audience: "Working professionals" }), true)));
+t("buyer: fallback accepts", !throws(() => checkBuyerInReasons([{ tierReason: "A low price is easy." }], input({ audience: "Working professionals" }), false)));
+{
+  const ok = { status: "ok", headline: "Headline here", bio: "b".repeat(80), sensitiveDomain: "none", products: [mp("ebook", "low", "a"), mp("template_pack", "low", "b")] };
+  t("acceptGeneration: generic on primary fails", throws(() => acceptGeneration(structuredClone(ok), input({ audience: "Working professionals" }), null, false, true)));
+  t("acceptGeneration: generic on fallback ok", !throws(() => acceptGeneration(structuredClone(ok), input({ audience: "Working professionals" }), null, false, false)));
+}
 console.log(fail ? `${fail} FAILED` : "ALL PASSED"); process.exit(fail ? 1 : 0);
