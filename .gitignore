@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# QA private links (never commit)
+qa/PRIVATE_LINKS.md

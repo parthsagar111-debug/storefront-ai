@@ -4,6 +4,20 @@ Per slice: what was built, problems hit, decisions made, how AI tools were used.
 
 ---
 
+## 🔎 QA run — Sat 21 Nov (full report: [QA_REPORT.md](QA_REPORT.md))
+1. Verdict: **ready with issues** — no P0; core journey works end to end on production with real AI.
+2. Results: **112 PASS · 7 FAIL · 0 BLOCKED · 0 NOT RUN** across journeys A–D and matrix areas A–G; 32/40 AI calls used.
+3. P1 **QA-01:** functions run in `iad1` (US) while Supabase is in Tokyo → 1.3–1.9 s per API call, 11.5 s tap-to-store. Fix: `vercel.json` `"regions": ["hnd1"]` (S).
+4. P1 **QA-02:** pasting an Instagram profile URL blocks creation with a generic "check your answers" (S).
+5. P1 **QA-03:** one bio invented a personal fact ("after my own experience postpartum") (M, prompt).
+6. P1 **QA-10:** finance store offered a portfolio review call / "safe stock" picks (M, prompt + check).
+7. P2: long unbroken text overflows at 360 px, product order not enforced, relative `og:url`, no S1 field messages, two-tab stale overwrite, no unsaved-changes prompt.
+8. Security, idempotency (double tap, lost response), stale-run recovery, draft/published split, events/throttles: all PASS.
+9. Production untouched; preview left at `FORCE_AI_FAIL=0`; 3 kept stores listed in the report (edit links only in git-ignored `qa/PRIVATE_LINKS.md`).
+10. Morning fix plan (~4–5 h, P1s ≈ 3 h): QA_REPORT §6.
+
+---
+
 ## ☀️ Morning report — Sat 21 Nov
 
 **Live:** https://storefront-ai-blush.vercel.app · showcase store: https://storefront-ai-blush.vercel.app/s/ananya-sharma-9h46
