@@ -1,6 +1,7 @@
 // Unit checks for the deterministic rules (SPEC §7.4). Run: npx tsx --conditions=react-server scripts/checks-test.ts
 import { scrubTierReason, checkClaims, sensitiveDomain, enforceLadder, toStoredProduct, checkDistinct, acceptProduct, buildStoreContent, acceptGeneration } from "../src/lib/ai/build-store";
 import { generationUserPrompt } from "../src/lib/ai/prompts";
+import { normalizeIndianMobile } from "../src/lib/whatsapp";
 import { parseInstagram } from "../src/lib/instagram";
 import type { StoreInput } from "../src/lib/server/input";
 import type { TModelProduct, TStoreContent } from "../src/lib/ai/schemas";
@@ -67,6 +68,13 @@ t("ladder: course + cohort fails", throws(() => enforceLadder([toStoredProduct(m
   t("rounds: final-round prompt forbids needs_more", /Do NOT return needs_more: return status "ok"/.test(generationUserPrompt(ci, undefined, { finalRound: true })));
   t("rounds: earlier rounds keep the normal instruction", /Only return needs_more if the input is still impossible/.test(generationUserPrompt(ci)));
 }
+// IQA-06 WhatsApp: letters rejected before normalising; separators allowed
+for (const [raw, want] of [
+  ["9876543210", "9876543210"], ["+91 98765 43210", "9876543210"], ["098765 43210", "9876543210"],
+  ["(+91) 98765-43210", "9876543210"], ["+91-98765-43210", "9876543210"],
+] as const) t(`whatsapp: "${raw}" → ${want}`, normalizeIndianMobile(raw) === want, String(normalizeIndianMobile(raw)));
+for (const raw of ["abc9876543210xyz", "98765abcde", "9876543210x", "+91 98765 4321O", "98765.43210", "12345", "+1 415 555 2671", "5876543210"])
+  t(`whatsapp: "${raw}" rejected`, normalizeIndianMobile(raw) === null, String(normalizeIndianMobile(raw)));
 // QA-02 Instagram parsing
 for (const [raw, want] of [
   ["https://instagram.com/qa.handle", "qa.handle"], ["https://www.instagram.com/qa_handle/", "qa_handle"],
