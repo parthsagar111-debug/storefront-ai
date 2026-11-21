@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Chip, ChoiceChip, Segmented, Logo, btnClass, inputCls } from "@/components/ui";
+import type { ReactNode } from "react";
 import { IconArrowUpRight, IconPlus, IconX, IconAlert } from "@/components/icons";
 import { parseInstagram, INSTAGRAM_HINT } from "@/lib/instagram";
 import {
@@ -24,11 +25,35 @@ const SIZES = [
   ["100k_plus", "100K+"],
 ] as const;
 
-const CHIPS = {
-  expertise: ["Home cooking", "Fitness for women", "Stock market basics", "UPSC prep", "Vedic astrology", "Canva design"],
-  audience: ["Working professionals", "College students", "New moms", "Small business owners"],
-  outcome: ["Cook in 20 minutes", "Lose weight without a gym", "Crack the exam", "Start investing"],
+// SPEC v5 V1: niche chips; audience and result chips depend on the niche (general audience chips if unknown).
+type Niche = "cooking" | "fitness" | "stocks" | "upsc" | "astrology" | "canva";
+const NICHES: [Niche, string, RegExp][] = [
+  ["cooking", "Home cooking", /cook|recipe|kitchen|baking|food|khana/i],
+  ["fitness", "Fitness for women", /fitness|workout|yoga|gym|exercise/i],
+  ["stocks", "Stock market basics", /stock|share market|invest|trading|finance|mutual fund|\bsip\b/i],
+  ["upsc", "UPSC prep", /upsc|ias\b|civil services/i],
+  ["astrology", "Vedic astrology", /astrolog|jyotish|horoscope|kundli/i],
+  ["canva", "Canva design", /canva|graphic design|design/i],
+];
+const AUDIENCE_CHIPS: Record<Niche | "general", string[]> = {
+  cooking: ["Working professionals", "Students living alone", "New moms", "Beginners"],
+  fitness: ["New moms", "Working women", "Beginners at home", "Women over 40"],
+  stocks: ["College students", "Salaried beginners", "Small business owners"],
+  upsc: ["First-time aspirants", "Working aspirants", "Mains repeaters"],
+  astrology: ["Working women", "Couples", "Beginners curious about astrology"],
+  canva: ["Small business owners", "Freelancers", "Students"],
+  general: ["Working professionals", "College students", "Beginners", "Small business owners"],
 };
+const RESULT_CHIPS: Record<Niche, string[]> = {
+  stocks: ["Start a first SIP", "Read a company's numbers", "Avoid common mistakes"],
+  cooking: ["Cook in 20 minutes", "Plan a week of meals", "Eat healthier on a budget"],
+  fitness: ["Get stronger at home", "Build a daily routine", "Recover after pregnancy safely"],
+  upsc: ["Write better Mains answers", "Plan the syllabus", "Revise faster"],
+  astrology: ["Read your own chart", "Understand your dasha", "Pick good dates"],
+  canva: ["Make posts in 10 minutes", "Build a brand kit", "Design for clients"],
+};
+/** The niche from a tapped chip or typed text; null → general chips. */
+const nicheOf = (expertise: string): Niche | null => NICHES.find(([, chip, re]) => expertise.trim() === chip || re.test(expertise))?.[0] ?? null;
 
 type Field = "name" | "expertise" | "audience" | "outcome";
 
@@ -37,7 +62,7 @@ const FIELD_MESSAGES: Record<string, string> = {
   name: "Add your name (at least 2 letters).",
   expertise: "Add a few words about what you're good at.",
   audience: "Add a few words about who you help.",
-  outcome: "Add a few words about what they get from you.",
+  outcome: "Keep the result under 500 characters.",
   audienceSize: "Pick how many people follow you.",
   instagramHandle: INSTAGRAM_HINT,
 };
@@ -82,7 +107,7 @@ function CreateFormInner() {
   const [size, setSize] = useState<string>("");
   const [lang, setLang] = useState<"en" | "hinglish">("en");
   const [insta, setInsta] = useState("");
-  const [showInsta, setShowInsta] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErr, setFieldErr] = useState<Record<string, string>>({});
@@ -110,10 +135,8 @@ function CreateFormInner() {
         setV({ name: i.name ?? "", expertise: i.expertise ?? "", audience: i.audience ?? "", outcome: i.outcome ?? "" });
         setSize(i.audienceSize ?? "");
         setLang(i.language ?? "en");
-        if (i.instagramHandle) {
-          setInsta(i.instagramHandle);
-          setShowInsta(true);
-        }
+        if (i.instagramHandle) setInsta(i.instagramHandle);
+        if (i.instagramHandle || i.outcome) setMoreOpen(true);
       })
       .catch(() => {});
   }, []);
@@ -137,7 +160,9 @@ function CreateFormInner() {
     return () => clearTimeout(t);
   }, []);
 
-  const valid = (Object.keys(v) as Field[]).every((k) => !tooThin(v[k])) && size !== "";
+  // The result is optional (V1): only name, what they teach and who it's for are checked.
+  const REQUIRED: Field[] = ["name", "expertise", "audience"];
+  const valid = REQUIRED.every((k) => !tooThin(v[k])) && size !== "";
 
   async function submit() {
     if (!valid || busy) return;
@@ -145,7 +170,8 @@ function CreateFormInner() {
     const handle = parseInstagram(insta);
     if (handle === null) {
       setFieldErr({ instagramHandle: FIELD_MESSAGES.instagramHandle });
-      document.getElementById("f-insta")?.focus();
+      setMoreOpen(true);
+      setTimeout(() => document.getElementById("f-insta")?.focus(), 0);
       return;
     }
     if (editToken) {
@@ -237,6 +263,7 @@ function CreateFormInner() {
   const label = "block text-sm font-bold";
   // QA-07: on blur, a touched field that the client check would block shows its message under the field.
   const blurCheck = (f: Field) => {
+    if (f === "outcome") return; // optional
     if (v[f] !== "" || touched.has(f)) {
       if (tooThin(v[f])) setFieldErr((e) => ({ ...e, [f]: FIELD_MESSAGES[f] }));
     }
@@ -259,11 +286,21 @@ function CreateFormInner() {
     );
   }
 
-  const fields = [
-    ["expertise", "What are you good at?"],
-    ["audience", "Who do you help?"],
-    ["outcome", "What do they get from you?"],
-  ] as const;
+  const niche = nicheOf(v.expertise);
+  const pick = (k: Field, c: string) => {
+    setV((cur) => ({ ...cur, [k]: c }));
+    clearErr(k);
+  };
+  const fieldProps = (k: Field) => ({
+    value: v[k],
+    error: fieldErr[k],
+    onChange: (val: string) => {
+      setV((cur) => ({ ...cur, [k]: val }));
+      setTouched((t) => new Set(t).add(k));
+      clearErr(k);
+    },
+    onBlur: () => blurCheck(k),
+  });
 
   return (
     <form
@@ -296,8 +333,8 @@ function CreateFormInner() {
           </header>
         ) : (
           <header className="space-y-2">
-            <h1 className="font-display text-[32px] font-bold leading-[1.1]">Turn what you know into a store people buy from.</h1>
-            <p className="text-muted">A few quick answers. Your store in about a minute.</p>
+            <h1 className="font-display text-[32px] font-bold leading-[1.1]">Turn what you know into a store in minutes.</h1>
+            <p className="text-muted">Tell us what you teach and who it&apos;s for. We&apos;ll suggest products and prices.</p>
           </header>
         )}
         {noStorage && (
@@ -307,66 +344,16 @@ function CreateFormInner() {
           </p>
         )}
 
-        <div className="space-y-2">
-          <label htmlFor="f-name" className={label}>
-            Your name
-          </label>
-          <input
-            id="f-name"
-            className={inputCls(Boolean(fieldErr.name))}
-            value={v.name}
-            maxLength={500}
-            autoComplete="name"
-            enterKeyHint="next"
-            aria-invalid={Boolean(fieldErr.name)}
-            aria-describedby={fieldErr.name ? "e-name" : undefined}
-            onChange={(e) => {
-              setV({ ...v, name: e.target.value });
-              setTouched((t) => new Set(t).add("name"));
-              clearErr("name");
-            }}
-            onBlur={() => blurCheck("name")}
-          />
-          <FieldError id="e-name" msg={fieldErr.name} />
-        </div>
+        <TextField k="name" label="I'm" placeholder="Your name" autoComplete="name" {...fieldProps("name")} />
 
-        {fields.map(([k, text]) => (
-          <div key={k} className="space-y-2">
-            <label htmlFor={`f-${k}`} className={label}>
-              {text}
-            </label>
-            <input
-              id={`f-${k}`}
-              className={inputCls(Boolean(fieldErr[k]))}
-              value={v[k]}
-              maxLength={500}
-              enterKeyHint="next"
-              aria-invalid={Boolean(fieldErr[k])}
-              aria-describedby={fieldErr[k] ? `e-${k}` : undefined}
-              onChange={(e) => {
-                setV({ ...v, [k]: e.target.value });
-                setTouched((t) => new Set(t).add(k));
-                clearErr(k);
-              }}
-              onBlur={() => blurCheck(k)}
-            />
-            <FieldError id={`e-${k}`} msg={fieldErr[k]} />
-            <div className="flex flex-wrap gap-2">
-              {CHIPS[k].map((c) => (
-                <Chip
-                  key={c}
-                  selected={v[k] === c}
-                  onClick={() => {
-                    setV({ ...v, [k]: c });
-                    clearErr(k);
-                  }}
-                >
-                  {c}
-                </Chip>
-              ))}
-            </div>
-          </div>
-        ))}
+        <TextField k="expertise" label="I teach" placeholder="e.g. Home cooking" {...fieldProps("expertise")}>
+          <ChipRow chips={NICHES.map(([, c]) => c)} value={v.expertise} onPick={(c) => pick("expertise", c)} />
+        </TextField>
+
+        <TextField k="audience" label="to" placeholder="e.g. Working professionals" {...fieldProps("audience")}>
+          {/* Chips follow the niche; tapping one fills the field, typed text is never overwritten by a niche change. */}
+          <ChipRow chips={AUDIENCE_CHIPS[niche ?? "general"]} value={v.audience} onPick={(c) => pick("audience", c)} />
+        </TextField>
 
         <fieldset className="space-y-2">
           <legend className={`${label} pb-2`}>How many people follow you?</legend>
@@ -401,61 +388,54 @@ function CreateFormInner() {
         </div>
 
         <div className="border-t border-line pt-2">
-          {showInsta ? (
-            <div className="space-y-2 pt-2">
-              <div className="flex items-center justify-between">
+          <button
+            type="button"
+            aria-expanded={moreOpen}
+            aria-controls="more-options"
+            className="flex min-h-12 w-full items-center justify-between text-left font-bold"
+            onClick={() => setMoreOpen((o) => !o)}
+          >
+            <span>
+              More options <span className="font-medium text-muted">(optional)</span>
+            </span>
+            {moreOpen ? <IconX size={18} /> : <IconPlus size={20} />}
+          </button>
+          {moreOpen && (
+            <div id="more-options" className="space-y-6 pt-3">
+              <TextField k="outcome" label="What result do they get?" optional placeholder="e.g. Cook in 20 minutes" {...fieldProps("outcome")}>
+                {niche && <ChipRow chips={RESULT_CHIPS[niche]} value={v.outcome} onPick={(c) => pick("outcome", c)} />}
+              </TextField>
+              <div className="space-y-2">
                 <label htmlFor="f-insta" className={label}>
                   Instagram handle <span className="font-medium text-muted">(optional)</span>
                 </label>
-                <button
-                  type="button"
-                  aria-label="Remove Instagram handle"
-                  className="flex min-h-11 min-w-11 items-center justify-center text-muted"
-                  onClick={() => {
-                    setInsta("");
-                    setShowInsta(false);
-                  }}
+                <div
+                  className={`flex overflow-hidden rounded-xl border bg-surface focus-within:border-saffron ${fieldErr.instagramHandle ? "border-danger" : "border-line-input"}`}
                 >
-                  <IconX size={18} />
-                </button>
+                  <span className="flex items-center bg-sand px-3 text-muted">@</span>
+                  <input
+                    id="f-insta"
+                    className="min-h-12 w-full px-3 text-base outline-none"
+                    value={insta.replace(/^@/, "")}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    aria-invalid={Boolean(fieldErr.instagramHandle)}
+                    aria-describedby={fieldErr.instagramHandle ? "e-instagramHandle h-insta" : "h-insta"}
+                    onChange={(e) => {
+                      setInsta(e.target.value);
+                      clearErr("instagramHandle");
+                    }}
+                    onBlur={() => {
+                      // A pasted profile URL becomes the handle the creator will see on the store.
+                      const h = parseInstagram(insta);
+                      if (h) setInsta(h);
+                    }}
+                  />
+                </div>
+                <FieldError id="e-instagramHandle" msg={fieldErr.instagramHandle} />
+                <p id="h-insta" className="text-xs text-muted">Shown as a link on your store. We don&apos;t read your profile.</p>
               </div>
-              <div
-                className={`flex overflow-hidden rounded-xl border bg-surface focus-within:border-saffron ${fieldErr.instagramHandle ? "border-danger" : "border-line-input"}`}
-              >
-                <span className="flex items-center bg-sand px-3 text-muted">@</span>
-                <input
-                  id="f-insta"
-                  className="min-h-12 w-full px-3 text-base outline-none"
-                  value={insta.replace(/^@/, "")}
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  aria-invalid={Boolean(fieldErr.instagramHandle)}
-                  aria-describedby={fieldErr.instagramHandle ? "e-instagramHandle" : undefined}
-                  onChange={(e) => {
-                    setInsta(e.target.value);
-                    clearErr("instagramHandle");
-                  }}
-                  onBlur={() => {
-                    // A pasted profile URL becomes the handle the creator will see on the store.
-                    const h = parseInstagram(insta);
-                    if (h) setInsta(h);
-                  }}
-                />
-              </div>
-              <FieldError id="e-instagramHandle" msg={fieldErr.instagramHandle} />
-              <p className="text-xs text-muted">Shown as a link on your store. We never read your profile.</p>
             </div>
-          ) : (
-            <button
-              type="button"
-              className="flex min-h-12 w-full items-center justify-between text-left font-bold"
-              onClick={() => setShowInsta(true)}
-            >
-              <span>
-                Instagram handle <span className="font-medium text-muted">(optional)</span>
-              </span>
-              <IconPlus size={20} />
-            </button>
           )}
         </div>
 
@@ -490,5 +470,56 @@ function CreateFormInner() {
         </div>
       )}
     </form>
+  );
+}
+
+/** One stacked full-width field (V1): sentence-style label, input, message, optional chips below. */
+function TextField(props: {
+  k: Field;
+  label: string;
+  placeholder?: string;
+  autoComplete?: string;
+  optional?: boolean;
+  value: string;
+  error?: string;
+  onChange: (v: string) => void;
+  onBlur: () => void;
+  children?: ReactNode;
+}) {
+  const { k, error } = props;
+  return (
+    <div className="space-y-2">
+      <label htmlFor={`f-${k}`} className="block text-sm font-bold">
+        {props.label}
+        {props.optional && <span className="font-medium text-muted"> (optional)</span>}
+      </label>
+      <input
+        id={`f-${k}`}
+        className={inputCls(Boolean(error))}
+        value={props.value}
+        placeholder={props.placeholder}
+        maxLength={500}
+        autoComplete={props.autoComplete}
+        enterKeyHint="next"
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? `e-${k}` : undefined}
+        onChange={(e) => props.onChange(e.target.value)}
+        onBlur={props.onBlur}
+      />
+      <FieldError id={`e-${k}`} msg={error} />
+      {props.children}
+    </div>
+  );
+}
+
+function ChipRow({ chips, value, onPick }: { chips: string[]; value: string; onPick: (c: string) => void }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {chips.map((c) => (
+        <Chip key={c} selected={value === c} onClick={() => onPick(c)}>
+          {c}
+        </Chip>
+      ))}
+    </div>
   );
 }

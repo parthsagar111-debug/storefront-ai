@@ -26,7 +26,8 @@ export const StoreInputSchema = z.object({
   name: answer,
   expertise: answer,
   audience: answer,
-  outcome: answer,
+  // SPEC v5 V1: the result is optional ("More options"); empty is fine, and a missing result never triggers a follow-up.
+  outcome: z.string().trim().max(500).optional().default(""),
   audienceSize: z.enum(Object.keys(AUDIENCE_SIZES) as [AudienceSize, ...AudienceSize[]]),
   language: z.enum(["en", "hinglish"]).default("en"),
   // QA-02: profile URLs, "@handle" and "handle" are all accepted and reduced to the handle.
@@ -44,7 +45,7 @@ export function toCreatorInput(i: StoreInput): CreatorInput {
     name: i.name,
     expertise: i.expertise,
     audience: i.audience,
-    outcome: i.outcome,
+    outcome: i.outcome || undefined,
     audienceSize: AUDIENCE_SIZES[i.audienceSize],
     language: i.language,
     instagramHandle: i.instagramHandle || undefined,

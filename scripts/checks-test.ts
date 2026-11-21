@@ -5,7 +5,7 @@ import { normalizeIndianMobile } from "../src/lib/whatsapp";
 import { parseInstagram } from "../src/lib/instagram";
 import { PRICE_TABLE, ENTRY_TIERS, ENTRY_MAX, TIER_ORDER, rangeFor, formatINR } from "../src/lib/pricing";
 import { FORMATS } from "../src/lib/ai/schemas";
-import type { StoreInput } from "../src/lib/server/input";
+import { StoreInputSchema, type StoreInput } from "../src/lib/server/input";
 import type { TModelProduct, TStoreContent } from "../src/lib/ai/schemas";
 
 let fail = 0;
@@ -173,5 +173,14 @@ for (const raw of ["qa handle!", "@@qa", "qa#handle", "https://instagram.com/", 
   const o = enforceLadder([toStoredProduct(mp("one_on_one", "typical"), "none"), toStoredProduct(mp("cohort_course", "low"), "none")]);
   t("ladder: one_on_one typical → low ₹299", o[0].tier === "low" && o[0].price === 299);
   t("ladder: recorded + cohort only → fails", throws(() => enforceLadder([toStoredProduct(mp("recorded_course", "low"), "none"), toStoredProduct(mp("cohort_course", "low"), "none")])));
+}
+// Round 3 item 4 (V1): the result is optional end to end
+{
+  const base = { name: "Asha", expertise: "Home cooking", audience: "New moms", audienceSize: "5k_20k", language: "en" };
+  const a = StoreInputSchema.safeParse(base);
+  t("input: missing result accepted", a.success && a.data.outcome === "");
+  t("input: empty result accepted", StoreInputSchema.safeParse({ ...base, outcome: "  " }).success);
+  t("input: audience still required", !StoreInputSchema.safeParse({ ...base, audience: "" }).success);
+  t("prompt: missing result → 'not given' line", generationUserPrompt({ ...base, outcome: "", audienceSize: "5K–20K followers", language: "en" }).includes("What their audience gets from them: not given; infer a realistic result"));
 }
 console.log(fail ? `${fail} FAILED` : "ALL PASSED"); process.exit(fail ? 1 : 0);
