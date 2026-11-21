@@ -788,4 +788,326 @@ Rule check = B7 checks + QA-03 backstory patterns + QA-10 finance-advice pattern
 
 ---
 
+## 10. Round 2 (Sat 21 Nov, production `caa90ab`)
+
+Changes: SPEC v4.5 / PROMPTS v3, finance "safe"-wording check, T28 Edit answers & regenerate, T29 Delete store, S4/S3 wording aligned with SPEC v4.5, plus two fixes found while testing (below). Core gate **43/43**; E25 and E26 **pass**; round-1 regression (honest interest, no lost edits) **5/5**.
+
+**Found and fixed during this round**
+- **PROMPTS v3 × SPEC §7.2 conflict:** v3's richer price reasons often exceeded the SPEC's `tierReason` max(160), so Zod rejected the attempt — single-product regenerate failed with 502 on both models (core gate E8). Fix: over-long reasons are trimmed to the whole sentences that fit (≤ 160) before validation. SPEC and PROMPTS text unchanged — **decision for Parth:** keep the trim, raise the SPEC cap, or add a length to the prompt.
+- **Next 16 preserved routes (T28):** after Edit answers the editor came back stale (old store, no polling), and an S1 restored from an earlier visit could lose edit mode. Fix: S1 and the editor are keyed by `useRouter().bfcacheId` (remount on push, restore on back/forward). E25 now goes S1 → Continue → editor → Edit answers by client-side navigation and checks the editor shows the generating screen and then the new products.
+
+### Mini eval (4 generations, production)
+| Store | Status / attempts | Rules (B7 + backstory + finance + "safe") | Hinglish gender | Live formats: first deliverable |
+|---|---|---|---|---|
+| Cooking / Hinglish (Ananya) | ok, 1 attempt | ✅ all pass | consistent feminine ("banati hoon") | live workshop → "1-hour live cooking session on Zoom" ✅ |
+| Finance / Hinglish (Arjun, college students) | ok, primary 503 → fallback | ✅ all pass; **no "safe"-type wording** | consistent masculine ("help karta hoon") | 1:1 → "45-minute live video call" ✅ |
+| Yoga for seniors / Hinglish (**Kiran**) | ok, 1 attempt | ✅ all pass | **neutral** — bio uses "mera focus hai…", no first-person gendered verb ("batati" refers to the guide) | 1:1 → "45-minute live video call on Zoom" ✅ |
+| UPSC 100K+ | ok, 1 attempt | ✅ all pass | — (English) | 1:1 → "45-minute private call on Zoom" ✅ |
+
+**tierReason — do they mention the audience?** Mostly yes (working professionals, students, seniors, aspirants in 11 of 12), and all were ≤ 160 chars this time (no trim needed). Two still lean generic, which v3 discourages: cooking ebook “…well suited for beginners who want a low-cost entry point…” (says *beginners*, not working professionals) and finance ebook “…a simple entry-level guide for students…”.
+- Cooking:
+  - `ebook/low` ₹149 — *Quick Recipe Guide* — tierReason: “A small and quick collection of recipes well suited for beginners who want a low-cost entry point to home cooking.”
+  - `template_pack/typical` ₹399 — *Weekly Meal Planner* — tierReason: “A solid set of templates that helps working professionals plan their weekly meals and grocery shopping efficiently.”
+  - `live_workshop/typical` ₹499 — *Live Cook-Along* — tierReason: “A live interactive session where working professionals can cook together and clear doubts in real time.”
+- Finance:
+  - `ebook/low` ₹149 — *Stock Market Starter Guide* — tierReason: “This is a simple entry-level guide for students to build foundational knowledge without a large commitment.”
+  - `template_pack/typical` ₹399 — *Budgeting & SIP Planner* — tierReason: “A practical tool that helps students manage their pocket money for consistent investing.”
+  - `one_on_one/typical` ₹999 — *Stock Market Q&A Session* — tierReason: “Provides students with direct access to get specific conceptual doubts cleared, offering high value for their learning.”
+- Yoga (Kiran):
+  - `ebook/low` ₹149 — *Senior Flexibility Guide* — tierReason: “This is a quick, low-cost entry ebook for seniors wanting to start flexibility work at home with simple PDFs.”
+  - `one_on_one/typical` ₹999 — *1-on-1 Senior Yoga Consultation* — tierReason: “A private 45-minute video call where seniors get personalised attention for their specific mobility needs.”
+  - `recorded_course/typical` ₹1,499 — *Pain-Free Joints Routine* — tierReason: “A solid recorded video course offering depth and clear visual guidance for seniors to practice safely at home.”
+- UPSC:
+  - `template_pack/low` ₹199 — *UPSC Answer Writing Checklist* — tierReason: “A quick-win resource for aspirants who want to improve daily answer structure without spending much time or money.”
+  - `recorded_course/typical` ₹1,499 — *UPSC Prelims Mock Test Series* — tierReason: “A solid practice package with video explanations for aspirants preparing for the upcoming Prelims exam.”
+  - `one_on_one/high` ₹1,999 — *1-on-1 UPSC Study Plan Review* — tierReason: “A private strategy call offering personal attention for aspirants who need custom guidance on their daily schedule and resource list.”
+
+**Other notes:** UPSC has a step-up (recorded mock-test course ₹1,499 → 1:1 ₹1,999; no cohort this run). The UPSC bio says "With over 100K followers" — taken from the audience-size answer, so not invented, but worth a look. Yoga copy uses "safe movements" / "practice safely" — health context, not a finance rule break.
+
+### Full JSON (stored drafts, no tokens)
+
+<details><summary>Cooking / Hinglish — Ananya</summary>
+
+```json
+{
+  "theme": "saffron",
+  "creator": {
+    "bio": "Working professionals ke liye home cooking ko simple aur fast banati hoon. Mera focus hai ki aap office ke baad bina kisi stress ke ghar ka bana hua tasty khana jaldi se taiyar kar sakein.",
+    "headline": "Tasty khana 20 minute mein",
+    "displayName": "QA Ananya Sharma"
+  },
+  "language": "hinglish",
+  "products": [
+    {
+      "id": "vB5gs4Q3",
+      "tier": "low",
+      "price": 149,
+      "title": "Quick Recipe Guide",
+      "format": "ebook",
+      "summary": "12 dinner recipes jo 20 minute mein ban jaati hain.",
+      "tierReason": "A small and quick collection of recipes well suited for beginners who want a low-cost entry point to home cooking.",
+      "whatYouGet": [
+        "PDF guide with 12 recipes",
+        "Ingredient checklist for every dish",
+        "Prep time saving tips"
+      ],
+      "description": "Busy working professionals ke liye special guide jisme hain 12 quick dinner recipes. Step-by-step instructions ke sath aap bina time waste kiye tasty khana bana sakenge.",
+      "priceSource": "ai_tier",
+      "availability": "coming_soon"
+    },
+    {
+      "id": "0fWeN8g6",
+      "tier": "typical",
+      "price": 399,
+      "title": "Weekly Meal Planner",
+      "format": "template_pack",
+      "summary": "Ek hafte ka meal plan aur grocery list.",
+      "tierReason": "A solid set of templates that helps working professionals plan their weekly meals and grocery shopping efficiently.",
+      "whatYouGet": [
+        "Weekly meal planner template",
+        "Smart grocery shopping checklist",
+        "Kitchen inventory tracker"
+      ],
+      "description": "Roz sochna padta hai ki kya banayein? Is template pack se aap apna poore hafte ka menu aur grocery shopping pehle hi plan kar sakte hain, jisse roz ka stress khatam ho jaye.",
+      "priceSource": "ai_tier",
+      "availability": "coming_soon"
+    },
+    {
+      "id": "HzQVzKTp",
+      "tier": "typical",
+      "price": 499,
+      "title": "Live Cook-Along",
+      "format": "live_workshop",
+      "summary": "Ek ghante ka live cooking session aur Q&A.",
+      "tierReason": "A live interactive session where working professionals can cook together and clear doubts in real time.",
+      "whatYouGet": [
+        "1-hour live cooking session on Zoom",
+        "Live Q&A to solve cooking doubts",
+        "Recording access for 30 days"
+      ],
+      "description": "Mere sath live judiye aur ek complete healthy meal 20 minute mein banana seekhiye. Session ke dauran aap apne sawaal pooch sakte hain aur live tips le sakte hain.",
+      "priceSource": "ai_tier",
+      "availability": "coming_soon"
+    }
+  ],
+  "sensitiveDomain": "none"
+}
+```
+</details>
+
+<details><summary>Finance / Hinglish — Arjun</summary>
+
+```json
+{
+  "theme": "indigo",
+  "creator": {
+    "bio": "Main Arjun hoon. College students ko stock market ki basics samajhne aur bina kisi dar ke chote amount se invest shuru karne mein help karta hoon. Mera focus sirf concepts clear karne par hai taaki aap bina kisi stress ke sahi decision le sakein.",
+    "headline": "Stock market basics ko simple banao",
+    "displayName": "QA Arjun Mehta"
+  },
+  "language": "hinglish",
+  "products": [
+    {
+      "id": "ue8uVto6",
+      "tier": "low",
+      "price": 149,
+      "title": "Stock Market Starter Guide",
+      "format": "ebook",
+      "summary": "Basic concepts aur investing ka guide",
+      "disclaimer": "For learning only. Not investment advice.",
+      "tierReason": "This is a simple entry-level guide for students to build foundational knowledge without a large commitment.",
+      "whatYouGet": [
+        "PDF with 20 pages on market basics",
+        "Glossary of common stock market terms",
+        "Checklist for opening your first demat account"
+      ],
+      "description": "Stock market ki basics, market kaise kaam karta hai aur pehla step kaise lein. Yeh guide college students ke liye hai jo zero se shuru karna chahte hain.",
+      "priceSource": "ai_tier",
+      "availability": "coming_soon"
+    },
+    {
+      "id": "NTwGI495",
+      "tier": "typical",
+      "price": 399,
+      "title": "Budgeting & SIP Planner",
+      "format": "template_pack",
+      "summary": "Monthly budget aur SIP tracker",
+      "disclaimer": "For learning only. Not investment advice.",
+      "tierReason": "A practical tool that helps students manage their pocket money for consistent investing.",
+      "whatYouGet": [
+        "Excel sheet for monthly expense tracking",
+        "SIP goal setting worksheet",
+        "PDF guide on choosing a monthly investment amount"
+      ],
+      "description": "Apne kharche track karein aur dekhein ki aap har mahine chota amount invest ke liye kaise nikal sakte hain. Ye templates aapko disciplined rehne mein help karenge.",
+      "priceSource": "ai_tier",
+      "availability": "coming_soon"
+    },
+    {
+      "id": "t1CkPiKj",
+      "tier": "typical",
+      "price": 999,
+      "title": "Stock Market Q&A Session",
+      "format": "one_on_one",
+      "summary": "Apne doubts clear karein",
+      "disclaimer": "For learning only. Not investment advice.",
+      "tierReason": "Provides students with direct access to get specific conceptual doubts cleared, offering high value for their learning.",
+      "whatYouGet": [
+        "45-minute live video call",
+        "Personalized learning roadmap",
+        "List of resources to continue your learning"
+      ],
+      "description": "Stock market ke concepts ya investing process ko lekar koi confusion hai? Is session mein hum aapke sawalon par baat karenge aur aapke liye ek learning plan banayenge.",
+      "priceSource": "ai_tier",
+      "availability": "coming_soon"
+    }
+  ],
+  "sensitiveDomain": "finance"
+}
+```
+</details>
+
+<details><summary>Yoga for seniors / Hinglish — Kiran</summary>
+
+```json
+{
+  "theme": "teal",
+  "creator": {
+    "bio": "Yoga teacher ke roop mein mera focus hai seniors ki flexibility aur joint health improve karne par. Bina kisi complex posture ke, simple aur safe movements ke zariye aap apni daily life ko aasan bana sakte hain.",
+    "headline": "Stay flexible aur pain-free ghar baithe",
+    "displayName": "QA Kiran"
+  },
+  "language": "hinglish",
+  "products": [
+    {
+      "id": "YOlNuovG",
+      "tier": "low",
+      "price": 149,
+      "title": "Senior Flexibility Guide",
+      "format": "ebook",
+      "summary": "Simple stretches jo joints ko flexible rakhein.",
+      "disclaimer": "For general wellness. Not medical advice.",
+      "tierReason": "This is a quick, low-cost entry ebook for seniors wanting to start flexibility work at home with simple PDFs.",
+      "whatYouGet": [
+        "PDF guide with 15 gentle stretches",
+        "Printable daily joint mobility checklist",
+        "Step-by-step posture safety instructions"
+      ],
+      "description": "Ek easy-to-read PDF guide jo seniors ke liye specially designed gentle stretches batati hai. Isse aap bina kisi equipment ke ghar par flexibility improve kar sakte hain.",
+      "priceSource": "ai_tier",
+      "availability": "coming_soon"
+    },
+    {
+      "id": "1vnSdAlE",
+      "tier": "typical",
+      "price": 999,
+      "title": "1-on-1 Senior Yoga Consultation",
+      "format": "one_on_one",
+      "summary": "Personalised session aapke specific body pain ke liye.",
+      "disclaimer": "For general wellness. Not medical advice.",
+      "tierReason": "A private 45-minute video call where seniors get personalised attention for their specific mobility needs.",
+      "whatYouGet": [
+        "45-minute live video call on Zoom",
+        "Personalised weekly yoga schedule PDF",
+        "Recording of the consultation session"
+      ],
+      "description": "Ek private 45-minute video call jisme hum aapki physical condition aur joint issues ko discuss karke ek customized home yoga routine banayenge.",
+      "priceSource": "ai_tier",
+      "availability": "coming_soon"
+    },
+    {
+      "id": "L65UxKbE",
+      "tier": "typical",
+      "price": 1499,
+      "title": "Pain-Free Joints Routine",
+      "format": "recorded_course",
+      "summary": "Joint pain kam karne ke liye recorded video lessons.",
+      "disclaimer": "For general wellness. Not medical advice.",
+      "tierReason": "A solid recorded video course offering depth and clear visual guidance for seniors to practice safely at home.",
+      "whatYouGet": [
+        "5 recorded video modules for joint health",
+        "Audio guided relaxation track for daily use",
+        "Progress tracking calendar template in PDF"
+      ],
+      "description": "Ek self-paced video course jisme seniors ke liye safe aur effective yoga sequences hain. Knee, back aur shoulder pain ko reduce karne ke liye daily practice videos milegi.",
+      "priceSource": "ai_tier",
+      "availability": "coming_soon"
+    }
+  ],
+  "sensitiveDomain": "health"
+}
+```
+</details>
+
+<details><summary>UPSC 100K+</summary>
+
+```json
+{
+  "theme": "indigo",
+  "creator": {
+    "bio": "I help UPSC aspirants build a structured study plan and master answer-writing practice. With over 100K followers, I share practical methods to cover the syllabus effectively without burning out.",
+    "headline": "Clear strategies to crack the UPSC exam",
+    "displayName": "QA Rohan Verma"
+  },
+  "language": "en",
+  "products": [
+    {
+      "id": "iPR-H5Dh",
+      "tier": "low",
+      "price": 199,
+      "title": "UPSC Answer Writing Checklist",
+      "format": "template_pack",
+      "summary": "Checklist and formats to structure daily UPSC answers.",
+      "tierReason": "A quick-win resource for aspirants who want to improve daily answer structure without spending much time or money.",
+      "whatYouGet": [
+        "PDF checklist for Mains answer structure",
+        "3 sample question format templates",
+        "Self-evaluation tracking sheet"
+      ],
+      "description": "Improve your Mains answer structure with this ready-to-use checklist. Designed for aspirants who struggle with time management and formatting during the exam, it helps you hit every key point clearly.",
+      "priceSource": "ai_tier",
+      "availability": "coming_soon"
+    },
+    {
+      "id": "B8MRWDHi",
+      "tier": "typical",
+      "price": 1499,
+      "title": "UPSC Prelims Mock Test Series",
+      "format": "recorded_course",
+      "summary": "Practice tests with video solutions for Prelims prep.",
+      "tierReason": "A solid practice package with video explanations for aspirants preparing for the upcoming Prelims exam.",
+      "whatYouGet": [
+        "5 full-length Prelims mock test papers",
+        "Recorded video solutions for each paper",
+        "Topic-wise performance analysis sheet"
+      ],
+      "description": "Test your preparation with structured mock papers and detailed video explanations. Built for aspirants who want to practice time management and identify weak areas before the exam.",
+      "priceSource": "ai_tier",
+      "availability": "coming_soon"
+    },
+    {
+      "id": "ONJehega",
+      "tier": "high",
+      "price": 1999,
+      "title": "1-on-1 UPSC Study Plan Review",
+      "format": "one_on_one",
+      "summary": "Private call to build your custom preparation roadmap.",
+      "tierReason": "A private strategy call offering personal attention for aspirants who need custom guidance on their daily schedule and resource list.",
+      "whatYouGet": [
+        "45-minute private call on Zoom",
+        "Custom weekly study schedule template",
+        "Direct chat support for follow-up doubts for a week"
+      ],
+      "description": "Get a personalized review of your study schedule and book list in a private 45-minute call. Ideal for aspirants who feel stuck, overwhelmed by the syllabus, or need a clear path forward.",
+      "priceSource": "ai_tier",
+      "availability": "coming_soon"
+    }
+  ],
+  "sensitiveDomain": "none"
+}
+```
+</details>
+
+---
+
 Run finished at 2026-11-21 11:59 IST. Shutting down.

@@ -4,6 +4,25 @@ Per slice: what was built, problems hit, decisions made, how AI tools were used.
 
 ---
 
+## 🛠 Round 2 — Sat 21 Nov evening (FIX_PROMPT_2; details in QA_REPORT §10)
+One deploy round (re-deployed twice for fixes found by its own tests); **core gate 43/43** on the final build `caa90ab`; E25 + E26 pass; round-1 regression 5/5.
+
+| Item | Change | Commit | Verified |
+|---|---|---|---|
+| 1 | SPEC v4.5 + PROMPTS v3 into the repo | `e121821` | — |
+| 2 | PROMPTS v3 → `prompts.ts` | `2d954dd` | yes: system prompt (en, hinglish) + 3 generation-message variants identical to PROMPTS.md |
+| 3 | Finance "safe"-type wording check | `c021332` | yes: 16 unit tests; 0 hits in the eval |
+| 4 | T28 Edit answers & regenerate | `2cc92aa` + `27bde1f` | yes: E25 on prod (incl. restored-route path), public page unchanged until republish |
+| 5 | T29 Delete store | `5d9e636` | yes: E26 on prod, wrong token → 404 |
+| — | SPEC v4.5 S4 "Publish with / without WhatsApp" + regenerate accessible names | `6533ad2` | yes (prod UI) — the repo's old SPEC had the older wording, so this wasn't built yet |
+| — | tierReason trim (PROMPTS v3 × SPEC §7.2 max 160) | `caa90ab` | yes: product regenerate 502 → 200 |
+| 6 | Mini eval (4 gens) | — | all rules pass; no "safe" finance wording; Hinglish gender consistent/neutral; live formats lead with the live session; 10/12 tierReasons audience-specific |
+| 7 | Cleanup to 0 stores | — | see final report |
+
+**Open for Parth:** (1) key rotation (item 0) still pending; (2) tierReason length: keep the code trim, raise SPEC's 160 cap, or add a length to PROMPTS; (3) T29 "rate-limited like other writes" — no other write is rate-limited today (only generation); delete is token-gated and one-shot, so no extra limiter was added.
+
+---
+
 ## 🛠 QA fixes — Sat 21 Nov (tag `pre-qa-fixes` = state before; details in QA_REPORT §9)
 Deployed to production in 4 rounds (1–5 · A–F · 6–7 · 10); **core gate 43/43 after every deploy**.
 
