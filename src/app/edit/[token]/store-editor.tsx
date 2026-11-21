@@ -156,10 +156,19 @@ export default function StoreEditor({
     const range = rangeFor(p.format);
     return (
       <div className="mb-2 space-y-1 rounded-2xl bg-saffron-soft px-4 py-3 text-sm text-ink [overflow-wrap:anywhere]">
-        <p>{p.priceSource === "creator" ? "You set this price." : p.tierReason}</p>
-        <p className="font-bold text-saffron-ink">
-          Typical range for {FORMAT_LABEL[p.format].toLowerCase()}s: {formatINR(range.min)}–{formatINR(range.max)}
-        </p>
+        {/* IQA-04: after a manual format/price change the AI's reason is stale → show only the range. */}
+        {p.priceSource === "creator" || !p.tierReason ? (
+          <p className="font-bold text-saffron-ink">
+            Suggested range for {FORMAT_LABEL[p.format].toLowerCase()}: {formatINR(range.min)}–{formatINR(range.max)}
+          </p>
+        ) : (
+          <>
+            <p>{p.tierReason}</p>
+            <p className="font-bold text-saffron-ink">
+              Typical range for {FORMAT_LABEL[p.format].toLowerCase()}s: {formatINR(range.min)}–{formatINR(range.max)}
+            </p>
+          </>
+        )}
       </div>
     );
   };

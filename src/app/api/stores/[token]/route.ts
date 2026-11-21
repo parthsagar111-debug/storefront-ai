@@ -96,6 +96,8 @@ export async function PATCH(req: Request, ctx: RouteContext<"/api/stores/[token]
           p.price = priceFor(p.format, "typical");
         }
         p.priceSource = p.price === priceFor(p.format, p.tier) ? "ai_tier" : "creator";
+        // IQA-04: the AI's tier reason described the old format/price — drop it so it can't contradict the new one.
+        p.tierReason = "";
       }
     }
     if (theme) draft.theme = theme;
