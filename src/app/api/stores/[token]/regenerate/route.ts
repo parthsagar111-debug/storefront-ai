@@ -62,7 +62,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/stores/[token]/
       user: bioUserPrompt(ci, current),
       schema: BioResultSchema,
       accept: (raw) => {
-        const r = BioResult.safeParse(raw);
+        const r = BioResult.safeParse(normalizeModelOutput(raw));
         if (!r.success) throw new CheckFailed("zod: " + r.error.message.slice(0, 300));
         return acceptBio(r.data, input, draft.sensitiveDomain);
       },

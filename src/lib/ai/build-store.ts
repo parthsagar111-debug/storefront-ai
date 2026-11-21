@@ -14,38 +14,60 @@ import type { StoreInput } from "@/lib/server/input";
 type Ok = Extract<import("./schemas").TGenerationResult, { status: "ok" }>;
 type Domain = TStoreContent["sensitiveDomain"];
 
-/** Parse the model's JSON into the Zod union (flat or union shape both accepted). */
-/** SPEC §7.2 caps tierReason at 160 chars; PROMPTS v3 asks for richer reasons, which models often write longer. */
+/**
+ * SPEC v5 V2 / PROMPTS v5 "Length enforcement in code": schema limits stay as they are. A text field over its
+ * limit by up to 15% is trimmed at a word boundary (whole sentences first for prose); beyond that it is left
+ * as is, so Zod fails the attempt (→ fallback model).
+ */
+export const OVER_LIMIT_TOLERANCE = 0.15;
 export const TIER_REASON_MAX = 160;
 
-/** Keep the whole sentences that fit in 160 chars; if even the first doesn't fit, cut at a word boundary with "…". */
-export function fitTierReason(reason: string): string {
-  const s = reason.trim().replace(/\s+/g, " ");
-  if (s.length <= TIER_REASON_MAX) return s;
-  let out = "";
-  for (const sentence of s.split(/(?<=[.!?])\s+/)) {
-    const next = out ? `${out} ${sentence}` : sentence;
-    if (next.length > TIER_REASON_MAX) break;
-    out = next;
+const DANGLING = /(?:[\s,;:–—&/-]+|\s+(?:and|or|for|with|to|of|in|on|the|a|an|aur|ke|ki|ka|se|mein))+$/i;
+
+/** Trim `text` to `max` chars when it is at most 15% over; prose keeps whole sentences when they fill ≥ 50%. */
+export function fitText(text: string, max: number, prose: boolean): string {
+  const s = text.trim().replace(/\s+/g, " ");
+  if (s.length <= max || s.length > Math.floor(max * (1 + OVER_LIMIT_TOLERANCE))) return s;
+  if (prose) {
+    let out = "";
+    for (const sentence of s.split(/(?<=[.!?])\s+/)) {
+      const next = out ? `${out} ${sentence}` : sentence;
+      if (next.length > max) break;
+      out = next;
+    }
+    if (out.length >= max * 0.5) return out;
   }
-  if (out) return out;
-  const cut = s.slice(0, TIER_REASON_MAX - 1);
-  return cut.slice(0, Math.max(cut.lastIndexOf(" "), 1)).replace(/[\s,;:–-]+$/, "") + "…";
+  const room = prose ? max - 1 : max;
+  let cut = s.slice(0, room + 1);
+  cut = cut.slice(0, Math.max(cut.lastIndexOf(" "), 1));
+  for (let prev = ""; prev !== cut; ) { prev = cut; cut = cut.replace(DANGLING, ""); }
+  return prose ? cut.replace(/[.!?]$/, "") + "…" : cut;
 }
 
-/** Normalise model output before Zod: over-long tierReasons are trimmed (full generation and single product). */
+/** Back-compat name used by tests: tierReason trimming under the same 15% rule. */
+export const fitTierReason = (reason: string) => fitText(reason, TIER_REASON_MAX, true);
+
+const LIMITS = { title: [60, false], summary: [90, true], description: [420, true], tierReason: [160, true] } as const;
+
+/** Normalise model output before Zod (full generation, bio and single product): the 15% trim on every text field. */
 export function normalizeModelOutput(raw: unknown): unknown {
   if (!raw || typeof raw !== "object") return raw;
-  const fix = (p: unknown) => {
-    if (p && typeof p === "object" && typeof (p as { tierReason?: unknown }).tierReason === "string")
-      (p as { tierReason: string }).tierReason = fitTierReason((p as { tierReason: string }).tierReason);
+  const r = raw as Record<string, unknown>;
+  const fixProduct = (p: unknown) => {
+    if (!p || typeof p !== "object") return;
+    const q = p as Record<string, unknown>;
+    for (const [k, [max, prose]] of Object.entries(LIMITS)) if (typeof q[k] === "string") q[k] = fitText(q[k] as string, max, prose);
+    if (Array.isArray(q.whatYouGet)) q.whatYouGet = q.whatYouGet.map((w) => (typeof w === "string" ? fitText(w, 70, false) : w));
   };
-  const r = raw as { products?: unknown; product?: unknown };
-  if (Array.isArray(r.products)) r.products.forEach(fix);
-  fix(r.product);
+  if (typeof r.headline === "string") r.headline = fitText(r.headline, 70, false);
+  if (typeof r.bio === "string") r.bio = fitText(r.bio, 320, true);
+  if (Array.isArray(r.directions)) r.directions = r.directions.map((d) => (typeof d === "string" ? fitText(d, 60, false) : d));
+  if (Array.isArray(r.products)) r.products.forEach(fixProduct);
+  fixProduct(r.product);
   return raw;
 }
 
+/** Parse the model's JSON into the Zod union (flat or union shape both accepted). */
 export function parseGeneration(raw: unknown) {
   const r = GenerationResult.safeParse(normalizeFlat(normalizeModelOutput(raw)));
   if (!r.success) throw new CheckFailed("zod: " + r.error.message.slice(0, 400));

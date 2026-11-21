@@ -1,5 +1,5 @@
 // Unit checks for the deterministic rules (SPEC §7.4). Run: npx tsx --conditions=react-server scripts/checks-test.ts
-import { scrubTierReason, checkClaims, sensitiveDomain, enforceLadder, toStoredProduct, checkDistinct, acceptProduct, buildStoreContent, acceptGeneration, fitTierReason, parseGeneration } from "../src/lib/ai/build-store";
+import { scrubTierReason, checkClaims, sensitiveDomain, enforceLadder, toStoredProduct, checkDistinct, acceptProduct, buildStoreContent, acceptGeneration, fitTierReason, parseGeneration, fitText, normalizeModelOutput } from "../src/lib/ai/build-store";
 import { generationUserPrompt } from "../src/lib/ai/prompts";
 import { normalizeIndianMobile } from "../src/lib/whatsapp";
 import { parseInstagram } from "../src/lib/instagram";
@@ -114,7 +114,27 @@ t("finance patterns inactive outside finance", !throws(() => checkClaims(["Portf
   t("tierReason: one long sentence cut at a word with …", f.length <= 160 && f.endsWith("…") && one.startsWith(f.slice(0, -1)), `${f.length}: ${f}`);
   const raw = { status: "ok", headline: "Headline here", bio: "b".repeat(80), sensitiveDomain: "none",
     products: [{ ...mp("ebook", "low", "a"), tierReason: two + " " + two }, mp("template_pack", "low", "b")] };
-  t("tierReason: generation with a 300+ char reason parses", !throws(() => parseGeneration(raw)));
+  t("tierReason: > 15% over (300+ chars) fails the attempt (SPEC v5 V2)", throws(() => parseGeneration(raw)));
+}
+// Round 3 item 1: every text field ≤ 15% over its limit is trimmed at a word boundary; beyond that, Zod fails.
+{
+  const words = (n: number) => Array.from({ length: n }, (_, i) => `word${i % 10}`).join(" ");
+  const t66 = "Ghar Ka Khana in Twenty Minutes for Working Professionals Daily"; // 63 chars
+  const ft = fitText(t66, 60, false);
+  t("title 63/60 → word boundary, no …", ft.length <= 60 && t66.startsWith(ft) && !ft.endsWith(" ") && !/\bfor$/.test(ft), ft);
+  t("title 70/60 (> 15%) unchanged → fails", fitText("x".repeat(70), 60, false).length === 70);
+  const bio = "Main ghar ka simple khana sikhati hoon. Office ke baad bhi 20 minute mein dinner ready. " + words(40);
+  const fb = fitText(bio.slice(0, 350), 320, true);
+  t("bio 350/320 → ≤ 320, ends with …", fb.length <= 320 && fb.endsWith("…"), `${fb.length}`);
+  const sent = "Short first sentence that is clear and long enough to keep here for the buyer reading it. " .repeat(3) + "Last bit.";
+  const fs = fitText(sent.slice(0, 100), 90, true);
+  t("summary ≤ 15% over keeps whole sentence when ≥ 50%", fs.length <= 90 && fs.endsWith("."), fs);
+  t("exact limit unchanged", fitText("y".repeat(60), 60, false) === "y".repeat(60));
+  const raw = { status: "ok", headline: "Cook dinner fast after a long day at the office, every day of the week now", bio: "b ".repeat(170).trim(), sensitiveDomain: "none",
+    products: [{ ...mp("ebook", "low", "a"), summary: "A clear summary line for this product that runs a little bit over the ninety limit ok", whatYouGet: ["Weekly grocery list template with swaps for every single dish here", "bbb", "ccc"] }, mp("template_pack", "low", "b")] };
+  normalizeModelOutput(raw);
+  t("generation: headline/bio/summary/whatYouGet trimmed → parses", !throws(() => parseGeneration(raw)));
+  t("directions trimmed to 60", (normalizeModelOutput({ status: "needs_more", question: "q", directions: ["Home workouts for new moms who have very little time each morning", "b", "c"] }) as { directions: string[] }).directions[0].length <= 60);
 }
 // QA-02 Instagram parsing
 for (const [raw, want] of [
