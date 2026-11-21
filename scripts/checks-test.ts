@@ -3,6 +3,8 @@ import { scrubTierReason, checkClaims, sensitiveDomain, enforceLadder, toStoredP
 import { generationUserPrompt } from "../src/lib/ai/prompts";
 import { normalizeIndianMobile } from "../src/lib/whatsapp";
 import { parseInstagram } from "../src/lib/instagram";
+import { PRICE_TABLE, ENTRY_TIERS, ENTRY_MAX, TIER_ORDER, rangeFor, formatINR } from "../src/lib/pricing";
+import { FORMATS } from "../src/lib/ai/schemas";
 import type { StoreInput } from "../src/lib/server/input";
 import type { TModelProduct, TStoreContent } from "../src/lib/ai/schemas";
 
@@ -32,7 +34,7 @@ t("distinct: duplicate format fails", throws(() => checkDistinct([mp("ebook", "l
 {
   const ps = [toStoredProduct(mp("recorded_course", "low"), "none"), toStoredProduct(mp("live_workshop", "high"), "none")];
   enforceLadder(ps);
-  t("ladder: workshop high → typical ₹499", ps[1].price === 499 && ps[1].tier === "typical", `${ps[1].tier} ${ps[1].price}`);
+  t("ladder: workshop high → typical ₹399", ps[1].price === 399 && ps[1].tier === "typical", `${ps[1].tier} ${ps[1].price}`);
 }
 t("ladder: course + cohort fails", throws(() => enforceLadder([toStoredProduct(mp("recorded_course", "low"), "none"), toStoredProduct(mp("cohort_course", "low"), "none")])));
 {
@@ -41,7 +43,7 @@ t("ladder: course + cohort fails", throws(() => enforceLadder([toStoredProduct(m
   const entryId = store.products[0].id;
   const next = acceptProduct(mp("one_on_one", "high"), input(), store, entryId);
   const fresh = next.find((p) => p.format === "one_on_one")!;
-  t("product regen: entry replaced → forced entry tier", fresh.tier === "low" && fresh.price === 499, `${fresh.tier} ${fresh.price}`);
+  t("product regen: entry replaced → forced entry tier", fresh.tier === "low" && fresh.price === 299, `${fresh.tier} ${fresh.price}`);
   t("product regen: new id (T20)", fresh.id !== entryId);
   t("product regen: other product untouched", next[1].id === store.products[1].id);
   t("product regen: used format rejected", throws(() => acceptProduct(mp("recorded_course", "low", "z"), input(), store, entryId)));
@@ -50,11 +52,11 @@ t("ladder: course + cohort fails", throws(() => enforceLadder([toStoredProduct(m
 // QA-05 product order: sorted by price after the ladder; product regenerate keeps its slot
 {
   const ok = { status: "ok" as const, headline: "Headline here", bio: "b".repeat(80), sensitiveDomain: "none" as const,
-    products: [mp("template_pack", "low", "a"), mp("recorded_course", "typical", "b"), mp("live_workshop", "high", "c")] }; // ₹199, ₹1,499, ₹999
+    products: [mp("template_pack", "low", "a"), mp("recorded_course", "typical", "b"), mp("live_workshop", "high", "c")] }; // ₹199, ₹1,499, ₹799
   const s = buildStoreContent(ok, input());
-  t("order: sorted cheapest → premium", s.products.map((p) => p.price).join(",") === "199,999,1499", s.products.map((p) => p.price).join(","));
-  const tie = buildStoreContent({ ...ok, products: [mp("ebook", "typical", "x"), mp("community", "typical", "y"), mp("one_on_one", "typical", "z")] }, input());
-  t("order: equal prices keep model order", tie.products.map((p) => p.format).join(",") === "ebook,community,one_on_one", tie.products.map((p) => p.format).join(","));
+  t("order: sorted cheapest → premium", s.products.map((p) => p.price).join(",") === "199,799,1499", s.products.map((p) => p.price).join(","));
+  const tie = buildStoreContent({ ...ok, products: [mp("community", "high", "y"), mp("ebook", "typical", "x"), mp("one_on_one", "low", "z")] }, input()); // ₹399, ₹299, ₹299
+  t("order: equal prices keep model order", tie.products.map((p) => p.format).join(",") === "ebook,one_on_one,community", tie.products.map((p) => p.format).join(","));
   const replaced = acceptProduct(mp("cohort_course", "typical", "new"), input(), s, s.products[1].id);
   t("order: product regenerate keeps its slot (no re-sort)", replaced[1].format === "cohort_course" && replaced.map((p) => p.price).join(",") === "199,4999,1499" && replaced[0].id === s.products[0].id, replaced.map((p) => p.price).join(","));
 }
@@ -144,4 +146,27 @@ for (const [raw, want] of [
 ] as const) t(`instagram: "${raw}" → "${want}"`, parseInstagram(raw) === want, String(parseInstagram(raw)));
 for (const raw of ["qa handle!", "@@qa", "qa#handle", "https://instagram.com/", "https://facebook.com/qa", "a".repeat(31)])
   t(`instagram: "${raw.slice(0, 32)}" rejected`, parseInstagram(raw) === null, String(parseInstagram(raw)));
+// Round 3 item 2 (V7): SPEC §7.5 v5 price table, entry-eligibility map and the ladder rule
+{
+  const want: Record<string, [number, number, number]> = { ebook: [149, 299, 499], template_pack: [199, 399, 699], recorded_course: [799, 1499, 2499], live_workshop: [199, 399, 799], cohort_course: [2499, 4999, 7999], one_on_one: [299, 699, 1499], community: [99, 199, 399] };
+  for (const f of FORMATS) {
+    const row = PRICE_TABLE[f];
+    t(`price table ${f} = ${want[f].join("/")}`, row.low === want[f][0] && row.typical === want[f][1] && row.high === want[f][2]);
+    t(`entry map ${f} matches ≤ ₹${ENTRY_MAX}`, JSON.stringify(ENTRY_TIERS[f]) === JSON.stringify(TIER_ORDER.filter((x) => row[x] <= ENTRY_MAX)), ENTRY_TIERS[f].join(","));
+    t(`prices ${f} end in 49/99`, [row.low, row.typical, row.high].every((n) => n % 100 === 49 || n % 100 === 99));
+  }
+  t("range shown: live_workshop ₹199–₹799", `${formatINR(rangeFor("live_workshop").min)}–${formatINR(rangeFor("live_workshop").max)}` === "₹199–₹799");
+  t("range shown: one_on_one ₹299–₹1,499", `${formatINR(rangeFor("one_on_one").min)}–${formatINR(rangeFor("one_on_one").max)}` === "₹299–₹1,499");
+  t("range shown: community ₹99–₹399", `${formatINR(rangeFor("community").min)}–${formatINR(rangeFor("community").max)}` === "₹99–₹399");
+  // ladder: community high (₹399) is now itself an entry product
+  const c = enforceLadder([toStoredProduct(mp("community", "high"), "none"), toStoredProduct(mp("cohort_course", "typical"), "none")]);
+  t("ladder: community high counts as entry (no change)", c[0].tier === "high" && c[0].price === 399);
+  // ladder: no entry product → live_workshop high moves to typical (₹399)
+  const l = enforceLadder([toStoredProduct(mp("live_workshop", "high"), "none"), toStoredProduct(mp("recorded_course", "low"), "none")]);
+  t("ladder: live_workshop high → typical ₹399", l[0].tier === "typical" && l[0].price === 399);
+  // ladder: one_on_one typical (₹699) → low (₹299)
+  const o = enforceLadder([toStoredProduct(mp("one_on_one", "typical"), "none"), toStoredProduct(mp("cohort_course", "low"), "none")]);
+  t("ladder: one_on_one typical → low ₹299", o[0].tier === "low" && o[0].price === 299);
+  t("ladder: recorded + cohort only → fails", throws(() => enforceLadder([toStoredProduct(mp("recorded_course", "low"), "none"), toStoredProduct(mp("cohort_course", "low"), "none")])));
+}
 console.log(fail ? `${fail} FAILED` : "ALL PASSED"); process.exit(fail ? 1 : 0);
