@@ -75,6 +75,28 @@ for (const [raw, want] of [
 ] as const) t(`whatsapp: "${raw}" → ${want}`, normalizeIndianMobile(raw) === want, String(normalizeIndianMobile(raw)));
 for (const raw of ["abc9876543210xyz", "98765abcde", "9876543210x", "+91 98765 4321O", "98765.43210", "12345", "+1 415 555 2671", "5876543210"])
   t(`whatsapp: "${raw}" rejected`, normalizeIndianMobile(raw) === null, String(normalizeIndianMobile(raw)));
+// QA-03 backstory patterns (positive + negative)
+for (const [txt, inp] of [
+  ["After my own experience postpartum, I help moms.", {}],
+  ["My own journey taught me this.", {}],
+  ["As a mother of two, I know the struggle.", {}],
+  ["As a certified nutritionist I plan meals.", {}],
+  ["I have 10 years of experience in yoga.", {}],
+  ["Coaching for 5+ years now.", {}],
+] as const) t(`backstory blocked: "${txt.slice(0, 40)}"`, throws(() => checkClaims([txt], input(inp))));
+for (const [txt, inp] of [
+  ["I have 10 years of experience in yoga.", { outcome: "I have taught for 10 years" }],
+  ["As a mother of two, I cook for busy families.", { expertise: "Cooking, as a mother of two" }],
+  ["Simple recipes for busy weeknights.", {}],
+  ["A 4-week plan with 20 recipes.", {}],
+  ["My journey with food started at home.", {}],
+] as const) t(`backstory allowed: "${txt.slice(0, 40)}"`, !throws(() => checkClaims([txt], input(inp))));
+// QA-10 finance advice patterns (only when the final domain is finance)
+for (const txt of ["1-on-1 Portfolio Review Call", "Personalised feedback on your stocks", "Pick your first safe stock", "Which stocks to buy this year", "Daily buy/sell calls", "Find the next multibagger", "Weekly stock tips", "Portfolio audit session", "best stock to buy now", "buy-sell tips on WhatsApp"])
+  t(`finance blocked: "${txt}"`, throws(() => checkClaims([txt], input({ expertise: "Stock market basics" }), "finance")));
+for (const txt of ["How the stock market works", "Build a habit of investing small amounts", "Understand mutual funds and SIPs", "Read a company balance sheet", "Avoid common beginner traps"])
+  t(`finance allowed: "${txt}"`, !throws(() => checkClaims([txt], input({ expertise: "Stock market basics" }), "finance")));
+t("finance patterns inactive outside finance", !throws(() => checkClaims(["Portfolio review of your design work"], input({ expertise: "Graphic design" }), "none")));
 // QA-02 Instagram parsing
 for (const [raw, want] of [
   ["https://instagram.com/qa.handle", "qa.handle"], ["https://www.instagram.com/qa_handle/", "qa_handle"],

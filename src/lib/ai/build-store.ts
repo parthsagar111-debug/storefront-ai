@@ -46,9 +46,38 @@ export function scrubTierReason(reason: string): string {
  * Banned claims → the attempt fails. Catches obvious cases only; prompt rules + eval set carry the rest (T23).
  * "certified" / "SEBI" are allowed only when the creator's own input mentions them.
  */
-export function checkClaims(texts: string[], input: StoreInput) {
+/** QA-03: first-person backstory / credentials — fail unless the creator's input contains the same phrase. */
+export const BACKSTORY_PATTERNS: RegExp[] = [
+  /\bmy own (experience|journey|story)\b/gi,
+  /\bas a (mother|mom|mum|doctor|nutritionist|certified|qualified)\b/gi,
+  /\b\d+\+?\s*years?\b/gi,
+];
+/** QA-10: when the final domain is finance, these offers are advice, not education (SPEC §7.3). */
+export const FINANCE_ADVICE_PATTERNS: RegExp[] = [
+  /\bportfolio (review|audit|check|advice)\b/i,
+  /\bfeedback on your (stocks|portfolio|holdings)\b/i,
+  /\bsafe stocks?\b/i,
+  /\b(which|best) stocks? to buy\b/i,
+  /\bbuy[ /-]sell (call|tip)s?\b/i,
+  /\bmultibaggers?\b/i,
+  /\bstock tips?\b/i,
+];
+
+export function checkClaims(texts: string[], input: StoreInput, domain: Domain = "none") {
   const all = texts.join("\n");
   const src = inputText(input);
+  const srcLower = src.toLowerCase().replace(/\s+/g, " ");
+  for (const re of BACKSTORY_PATTERNS) {
+    for (const m of all.matchAll(re)) {
+      if (!srcLower.includes(m[0].toLowerCase().replace(/\s+/g, " "))) throw new CheckFailed(`invented backstory: "${m[0]}"`);
+    }
+  }
+  if (domain === "finance") {
+    for (const re of FINANCE_ADVICE_PATTERNS) {
+      const m = all.match(re);
+      if (m) throw new CheckFailed(`finance advice: "${m[0]}"`);
+    }
+  }
   const rules: [string, RegExp, boolean][] = [
     ["guaranteed", /\bguarantee(d|s)?\b/i, true],
     ["100%", /\b100\s?%|\bhundred percent\b/i, true],
@@ -121,8 +150,8 @@ export function themeFor(input: StoreInput): TStoreContent["theme"] {
 /** Full generation / regenerate all → StoreContent. Creator identity fields always come from input/current store. */
 export function buildStoreContent(ok: Ok, input: StoreInput, existing?: TStoreContent | null): TStoreContent {
   checkDistinct(ok.products);
-  checkClaims([ok.headline, ok.bio, ...ok.products.flatMap(productTexts)], input);
   const domain = sensitiveDomain(ok.sensitiveDomain, input);
+  checkClaims([ok.headline, ok.bio, ...ok.products.flatMap(productTexts)], input, domain);
   // QA-05: code-enforced order — cheapest → most premium, after the ladder repair (stable for equal prices).
   // Single-product regenerate (acceptProduct) keeps its slot and does not re-sort.
   const products = sortByPrice(enforceLadder(ok.products.map((p) => toStoredProduct(p, domain))));
@@ -142,8 +171,8 @@ export function buildStoreContent(ok: Ok, input: StoreInput, existing?: TStoreCo
 }
 
 /** Bio regenerate: claims check only (no prices involved). */
-export function acceptBio(r: { headline: string; bio: string }, input: StoreInput) {
-  checkClaims([r.headline, r.bio], input);
+export function acceptBio(r: { headline: string; bio: string }, input: StoreInput, domain: Domain = "none") {
+  checkClaims([r.headline, r.bio], input, domain);
   return r;
 }
 
@@ -154,7 +183,7 @@ export function acceptBio(r: { headline: string; bio: string }, input: StoreInpu
 export function acceptProduct(p: TModelProduct, input: StoreInput, store: TStoreContent, replaceId: string): TProduct[] {
   const others = store.products.filter((x) => x.id !== replaceId);
   checkDistinct([...others, p]);
-  checkClaims(productTexts(p), input);
+  checkClaims(productTexts(p), input, store.sensitiveDomain);
   const fresh = toStoredProduct(p, store.sensitiveDomain);
   const next = store.products.map((x) => (x.id === replaceId ? fresh : x));
   if (!next.some((x) => x.price <= ENTRY_MAX)) {

@@ -64,7 +64,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/stores/[token]/
       accept: (raw) => {
         const r = BioResult.safeParse(raw);
         if (!r.success) throw new CheckFailed("zod: " + r.error.message.slice(0, 300));
-        return acceptBio(r.data, input);
+        return acceptBio(r.data, input, draft.sensitiveDomain);
       },
     });
     if (!out.ok) return Response.json({ error: "ai_failed" }, { status: 502 });
