@@ -102,6 +102,10 @@ export function enforceLadder(products: TProduct[]): TProduct[] {
   return products;
 }
 
+/** Price ascending; equal prices keep the model's order. */
+export const sortByPrice = (products: TProduct[]): TProduct[] =>
+  products.map((p, i) => [p, i] as const).sort((a, b) => a[0].price - b[0].price || a[1] - b[1]).map(([p]) => p);
+
 const THEME_KEYWORDS: [TStoreContent["theme"], RegExp][] = [
   ["teal", /fitness|yoga|diet|nutrition|health|wellness|gym|workout|weight/i],
   ["indigo", /stock|market|financ|invest|trading|money|tax|upsc|exam|career|coding|tech/i],
@@ -119,7 +123,9 @@ export function buildStoreContent(ok: Ok, input: StoreInput, existing?: TStoreCo
   checkDistinct(ok.products);
   checkClaims([ok.headline, ok.bio, ...ok.products.flatMap(productTexts)], input);
   const domain = sensitiveDomain(ok.sensitiveDomain, input);
-  const products = enforceLadder(ok.products.map((p) => toStoredProduct(p, domain)));
+  // QA-05: code-enforced order — cheapest → most premium, after the ladder repair (stable for equal prices).
+  // Single-product regenerate (acceptProduct) keeps its slot and does not re-sort.
+  const products = sortByPrice(enforceLadder(ok.products.map((p) => toStoredProduct(p, domain))));
   return {
     creator: {
       displayName: existing?.creator.displayName ?? input.name,

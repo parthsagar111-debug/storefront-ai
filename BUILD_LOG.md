@@ -4,6 +4,9 @@ Per slice: what was built, problems hit, decisions made, how AI tools were used.
 
 ---
 
+## Code-enforced rules (added by QA fixes)
+- **Product order (QA-05):** after the ladder check, `buildStoreContent` sorts products by price ascending (equal prices keep the model's order). This applies to full generation and Regenerate all. A single-product regenerate keeps its slot and does not re-sort. Previously only a prompt instruction.
+
 ## 🔎 QA run — Sat 21 Nov (full report: [QA_REPORT.md](QA_REPORT.md))
 1. Verdict: **ready with issues** — no P0; core journey works end to end on production with real AI.
 2. Results: **112 PASS · 7 FAIL · 0 BLOCKED · 0 NOT RUN** across journeys A–D and matrix areas A–G; 32/40 AI calls used.

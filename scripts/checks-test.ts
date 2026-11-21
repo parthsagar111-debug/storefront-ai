@@ -1,5 +1,5 @@
 // Unit checks for the deterministic rules (SPEC §7.4). Run: npx tsx --conditions=react-server scripts/checks-test.ts
-import { scrubTierReason, checkClaims, sensitiveDomain, enforceLadder, toStoredProduct, checkDistinct, acceptProduct } from "../src/lib/ai/build-store";
+import { scrubTierReason, checkClaims, sensitiveDomain, enforceLadder, toStoredProduct, checkDistinct, acceptProduct, buildStoreContent } from "../src/lib/ai/build-store";
 import { parseInstagram } from "../src/lib/instagram";
 import type { StoreInput } from "../src/lib/server/input";
 import type { TModelProduct, TStoreContent } from "../src/lib/ai/schemas";
@@ -44,6 +44,17 @@ t("ladder: course + cohort fails", throws(() => enforceLadder([toStoredProduct(m
   t("product regen: other product untouched", next[1].id === store.products[1].id);
   t("product regen: used format rejected", throws(() => acceptProduct(mp("recorded_course", "low", "z"), input(), store, entryId)));
   t("product regen: entry-ineligible replacement fails", throws(() => acceptProduct(mp("cohort_course", "low", "q"), input(), store, entryId)));
+}
+// QA-05 product order: sorted by price after the ladder; product regenerate keeps its slot
+{
+  const ok = { status: "ok" as const, headline: "Headline here", bio: "b".repeat(80), sensitiveDomain: "none" as const,
+    products: [mp("template_pack", "low", "a"), mp("recorded_course", "typical", "b"), mp("live_workshop", "high", "c")] }; // ₹199, ₹1,499, ₹999
+  const s = buildStoreContent(ok, input());
+  t("order: sorted cheapest → premium", s.products.map((p) => p.price).join(",") === "199,999,1499", s.products.map((p) => p.price).join(","));
+  const tie = buildStoreContent({ ...ok, products: [mp("ebook", "typical", "x"), mp("community", "typical", "y"), mp("one_on_one", "typical", "z")] }, input());
+  t("order: equal prices keep model order", tie.products.map((p) => p.format).join(",") === "ebook,community,one_on_one", tie.products.map((p) => p.format).join(","));
+  const replaced = acceptProduct(mp("cohort_course", "typical", "new"), input(), s, s.products[1].id);
+  t("order: product regenerate keeps its slot (no re-sort)", replaced[1].format === "cohort_course" && replaced.map((p) => p.price).join(",") === "199,4999,1499" && replaced[0].id === s.products[0].id, replaced.map((p) => p.price).join(","));
 }
 // QA-02 Instagram parsing
 for (const [raw, want] of [
