@@ -6,6 +6,8 @@ const display = Bricolage_Grotesque({ variable: "--font-bricolage", subsets: ["l
 const body = Plus_Jakarta_Sans({ variable: "--font-jakarta", subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
 export const metadata: Metadata = {
+  // QA-06: absolute og:url / canonical URLs for link previews.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://storefront-ai-blush.vercel.app"),
   title: "Storefront AI",
   description: "A few quick answers. Your store in about a minute.",
 };
