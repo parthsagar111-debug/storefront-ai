@@ -75,7 +75,8 @@ export async function runGeneration(storeId: string, preClaimed?: StoreRow): Pro
   if (value.kind === "ok") {
     const w = await finish({ status: "ready", draft: value.content, draft_rev: (store.draft_rev ?? 0) + 1, follow_up: null, model_used: model });
     if (w !== "written") return writeFailed(w, { model, attempts, latencyMs });
-    await logEvent(storeId, "generation_completed", { model, attempts, latencyMs });
+    // Round 4 item 3: primary fires show up as a failed attempt "generic tier reasons…"; this marks the kept ones.
+    await logEvent(storeId, "generation_completed", { model, attempts, latencyMs, genericReasonsKept: Boolean(value.genericReasons) });
   } else {
     const prevRound = store.follow_up?.kind === "needs_more" ? store.follow_up.round : 0;
     const follow_up: FollowUp =
@@ -85,13 +86,6 @@ export async function runGeneration(storeId: string, preClaimed?: StoreRow): Pro
     const w = await finish({ status: "needs_input", follow_up, model_used: model });
     if (w !== "written") return writeFailed(w, { model, attempts, latencyMs, outcome: value.kind });
     if (value.kind === "needs_more") await logEvent(storeId, "followup_shown", { round: follow_up.kind === "needs_more" ? follow_up.round : 0 });
-    await logEvent(storeId, "generation_completed", {
-      model,
-      attempts,
-      latencyMs,
-      outcome: value.kind,
-      // Round 4 item 3: primary fires show up as a failed attempt "generic tier reasons…"; this marks the kept ones.
-      ...(value.kind === "ok" ? { genericReasonsKept: Boolean(value.genericReasons) } : {}),
-    });
+    await logEvent(storeId, "generation_completed", { model, attempts, latencyMs, outcome: value.kind });
   }
 }
