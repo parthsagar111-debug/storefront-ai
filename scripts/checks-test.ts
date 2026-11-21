@@ -1,7 +1,7 @@
 // Unit checks for the deterministic rules (SPEC §7.4). Run: npx tsx --conditions=react-server scripts/checks-test.ts
 import { scrubTierReason, checkClaims, sensitiveDomain, enforceLadder, toStoredProduct, checkDistinct, acceptProduct, buildStoreContent, acceptGeneration, fitTierReason, parseGeneration, fitText, normalizeModelOutput } from "../src/lib/ai/build-store";
 import { generationUserPrompt } from "../src/lib/ai/prompts";
-import { normalizeIndianMobile } from "../src/lib/whatsapp";
+import { normalizeIndianMobile, waText, waLink } from "../src/lib/whatsapp";
 import { parseInstagram } from "../src/lib/instagram";
 import { PRICE_TABLE, ENTRY_TIERS, ENTRY_MAX, TIER_ORDER, rangeFor, formatINR } from "../src/lib/pricing";
 import { FORMATS } from "../src/lib/ai/schemas";
@@ -183,4 +183,10 @@ for (const raw of ["qa handle!", "@@qa", "qa#handle", "https://instagram.com/", 
   t("input: audience still required", !StoreInputSchema.safeParse({ ...base, audience: "" }).success);
   t("prompt: missing result → 'not given' line", generationUserPrompt({ ...base, outcome: "", audienceSize: "5K–20K followers", language: "en" }).includes("What their audience gets from them: not given; infer a realistic result"));
 }
+// Round 3 item 8 (V6): WhatsApp prefill = title + price, in the store's language
+t("wa buy en", waText("buy", "Ananya", "Tiffin Plan", 1499, "en") === 'Hi Ananya, I\'d like to buy "Tiffin Plan" (₹1,499).');
+t("wa ask en", waText("ask", "Ananya", "Tiffin Plan", 299, "en") === 'Hi Ananya, I have a question about "Tiffin Plan" (₹299).');
+t("wa buy hinglish", waText("buy", "Ananya", "Tiffin Plan", 1499, "hinglish") === 'Hi Ananya, mujhe "Tiffin Plan" (₹1,499) lena hai.');
+t("wa ask hinglish", waText("ask", "Ananya", "Tiffin Plan", 299, "hinglish") === 'Hi Ananya, "Tiffin Plan" (₹299) ke baare mein ek sawaal hai.');
+t("wa link encodes text + 91", waLink("9876543210", "A", "T", 199).startsWith("https://wa.me/919876543210?text=Hi%20A"));
 console.log(fail ? `${fail} FAILED` : "ALL PASSED"); process.exit(fail ? 1 : 0);

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { StoreView, THEMES } from "@/components/store-view";
 import { IconChat, IconCheck } from "@/components/icons";
 import type { TStoreContent, TProduct } from "@/lib/ai/schemas";
-import { waLink, waAskLink } from "@/lib/whatsapp";
+import { waLink, waAskLink, normalizeIndianMobile } from "@/lib/whatsapp";
 
 /** Visitor id: random, in localStorage (per browser); per page load if storage is blocked (T4). */
 function visitorId(): string {
@@ -40,6 +40,9 @@ export default function PublicStore({ slug, content, preview = false }: { slug: 
   // IQA-02: per-product send state; "Thanks!" only after the server confirms.
   const [sending, setSending] = useState<Record<string, "sending" | "failed">>({});
   const c = content.creator;
+  // V6: WhatsApp CTAs only with a valid stored number (re-validated at render).
+  const wa = normalizeIndianMobile(c.whatsapp);
+  const lang = content.language;
   const firstName = c.displayName.split(/\s+/)[0];
   const t = THEMES[content.theme];
 
@@ -97,19 +100,22 @@ export default function PublicStore({ slug, content, preview = false }: { slug: 
   // Exactly one primary action per card: Available now → Enquire on WhatsApp; Coming soon → I'm interested.
   const cta = (p: TProduct) => (preview ? <div inert>{liveCta(p)}</div> : liveCta(p));
   const liveCta = (p: TProduct) => {
-    if (p.availability === "available" && c.whatsapp) {
+    if (p.availability === "available" && wa) {
       return (
-        <a
-          className={primary}
-          style={{ background: t.accent }}
-          href={waLink(c.whatsapp, firstName, p.title)}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => send("whatsapp_tapped", p.id)}
-        >
-          <IconChat size={18} />
-          Enquire on WhatsApp
-        </a>
+        <div className="space-y-1.5">
+          <a
+            className={primary}
+            style={{ background: t.accent }}
+            href={waLink(wa, firstName, p.title, p.price, lang)}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => send("whatsapp_tapped", p.id)}
+          >
+            <IconChat size={18} />
+            Enquire on WhatsApp
+          </a>
+          <p className="text-center text-xs text-muted">Chat with {firstName} to buy. No payment on this page.</p>
+        </div>
       );
     }
     const done = tapped.includes(p.id);
@@ -139,13 +145,13 @@ export default function PublicStore({ slug, content, preview = false }: { slug: 
             )}
           </>
         )}
-        {(c.whatsapp || c.instagramHandle) && (
+        {(wa || c.instagramHandle) && (
           <div className="flex flex-wrap justify-center gap-x-6">
-            {c.whatsapp && (
+            {wa && (
               <a
                 className={link}
                 style={{ color: t.accent }}
-                href={waAskLink(c.whatsapp, firstName, p.title)}
+                href={waAskLink(wa, firstName, p.title, p.price, lang)}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => send("whatsapp_tapped", p.id)}
@@ -165,7 +171,7 @@ export default function PublicStore({ slug, content, preview = false }: { slug: 
   };
 
   return (
-    <div className="min-h-dvh md:dot-grid md:py-16">
+    <div className="min-h-dvh md:dot-grid md:py-16" data-store={preview ? undefined : slug}>
       <div className="mx-auto w-full max-w-[480px] overflow-hidden bg-paper md:rounded-[28px] md:bg-surface md:shadow-[0_24px_80px_rgba(34,26,20,0.14)]">
         <StoreView variant="public" content={content} productCta={cta} />
         <footer {...(preview ? { inert: true } : {})} className="mt-8 border-t border-line px-5 py-5 text-center text-sm text-muted">

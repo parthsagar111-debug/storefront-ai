@@ -10,12 +10,20 @@ export function normalizeIndianMobile(raw: string | undefined | null): string | 
   return /^[6-9]\d{9}$/.test(d) ? d : null;
 }
 
-export function waLink(number: string, name: string, title: string) {
-  const text = `Hi ${name}, I'd like to buy "${title}"`;
-  return `https://wa.me/91${number}?text=${encodeURIComponent(text)}`;
+const inr = (n: number) => "₹" + n.toLocaleString("en-IN");
+
+/** SPEC v5 V6: WhatsApp prefill with title + price, in the store's language. */
+export function waText(kind: "buy" | "ask", name: string, title: string, price: number, language: "en" | "hinglish" = "en") {
+  const item = `"${title}" (${inr(price)})`;
+  if (language === "hinglish")
+    return kind === "buy" ? `Hi ${name}, mujhe ${item} lena hai.` : `Hi ${name}, ${item} ke baare mein ek sawaal hai.`;
+  return kind === "buy" ? `Hi ${name}, I'd like to buy ${item}.` : `Hi ${name}, I have a question about ${item}.`;
 }
 
-export function waAskLink(number: string, name: string, title: string) {
-  const text = `Hi ${name}, I have a question about "${title}"`;
-  return `https://wa.me/91${number}?text=${encodeURIComponent(text)}`;
+export function waLink(number: string, name: string, title: string, price: number, language: "en" | "hinglish" = "en") {
+  return `https://wa.me/91${number}?text=${encodeURIComponent(waText("buy", name, title, price, language))}`;
+}
+
+export function waAskLink(number: string, name: string, title: string, price: number, language: "en" | "hinglish" = "en") {
+  return `https://wa.me/91${number}?text=${encodeURIComponent(waText("ask", name, title, price, language))}`;
 }

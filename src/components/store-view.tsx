@@ -36,6 +36,8 @@ const COVER: Record<TProduct["format"], { from: string; to: string; Icon: Compon
   community: { from: "#0369A1", to: "#0C4A6E", Icon: IconUsers },
 };
 
+const byPrice = (ps: TProduct[]) => ps.map((p, i) => [p, i] as const).sort((a, b) => a[0].price - b[0].price || a[1] - b[1]).map(([p]) => p);
+
 const initials = (name: string) =>
   name
     .split(/\s+/)
@@ -109,26 +111,44 @@ export function StoreView(props: StoreViewProps) {
       )}
 
       {props.beforeProducts}
-      <section className={`space-y-4 ${editor ? "" : "px-4"}`} aria-label="Products">
-        {content.products.map((p) => {
-          const card = (
-            <ProductCard
-              p={p}
-              theme={t}
-              cta={props.productCta?.(p)}
-              footer={props.productFooter?.(p)}
-              busy={Boolean(busy?.all || busy?.productId === p.id)}
-            />
-          );
-          return editor ? (
+      {editor ? (
+        <section className="space-y-4" aria-label="Products">
+          {content.products.map((p) => (
             <EditorBlock key={p.id} toolbar={props.productToolbar?.(p)} note={props.productNote?.(p)} highlight={props.highlightId === p.id} busy={false}>
-              {card}
+              <ProductCard
+                p={p}
+                theme={t}
+                showDisclaimer={content.sensitiveDomain !== "none"}
+                cta={props.productCta?.(p)}
+                footer={props.productFooter?.(p)}
+                busy={Boolean(busy?.all || busy?.productId === p.id)}
+              />
             </EditorBlock>
-          ) : (
-            <div key={p.id}>{card}</div>
-          );
-        })}
-      </section>
+          ))}
+        </section>
+      ) : (
+        // V6: Available now first (cheapest first), then a "Coming soon" subheading (cheapest first).
+        [byPrice(content.products.filter((p) => p.availability === "available")), byPrice(content.products.filter((p) => p.availability !== "available"))].map(
+          (group, gi) =>
+            group.length > 0 && (
+              <section key={gi} className="space-y-4 px-4" aria-label={gi === 0 ? "Available now" : "Coming soon"}>
+                {gi === 1 && <h2 className="pt-2 font-display text-lg font-bold">Coming soon</h2>}
+                {group.map((p) => (
+                  <div key={p.id}>
+                    <ProductCard
+                      p={p}
+                      theme={t}
+                      indicative={gi === 1}
+                      showDisclaimer={content.sensitiveDomain !== "none"}
+                      cta={props.productCta?.(p)}
+                      busy={Boolean(busy?.all || busy?.productId === p.id)}
+                    />
+                  </div>
+                ))}
+              </section>
+            ),
+        )
+      )}
     </div>
   );
 }
@@ -161,7 +181,25 @@ function BusyOverlay({ busy, children }: { busy: boolean; children: ReactNode })
   );
 }
 
-function ProductCard({ p, theme, cta, footer, busy }: { p: TProduct; theme: (typeof THEMES)[keyof typeof THEMES]; cta?: ReactNode; footer?: ReactNode; busy: boolean }) {
+function ProductCard({
+  p,
+  theme,
+  cta,
+  footer,
+  busy,
+  indicative = false,
+  showDisclaimer,
+}: {
+  p: TProduct;
+  theme: (typeof THEMES)[keyof typeof THEMES];
+  cta?: ReactNode;
+  footer?: ReactNode;
+  busy: boolean;
+  /** V6: public coming-soon cards say the price is indicative. */
+  indicative?: boolean;
+  /** V6: disclaimers only when the store's domain applies. */
+  showDisclaimer: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const cover = COVER[p.format];
   const available = p.availability === "available";
@@ -187,6 +225,7 @@ function ProductCard({ p, theme, cta, footer, busy }: { p: TProduct; theme: (typ
             <span className="shrink-0 font-display text-[21px] font-bold leading-tight [overflow-wrap:anywhere]">{formatINR(p.price)}</span>
           </div>
           <p className="text-sm leading-relaxed text-muted [overflow-wrap:anywhere]">{p.summary}</p>
+          {indicative && <p className="text-xs text-muted">Indicative price. Final price may change when available.</p>}
           {cta}
         </div>
         <button
@@ -210,7 +249,7 @@ function ProductCard({ p, theme, cta, footer, busy }: { p: TProduct; theme: (typ
                 </li>
               ))}
             </ul>
-            {p.disclaimer && <p className="rounded-lg bg-sand px-3 py-2 text-xs text-muted">{p.disclaimer}</p>}
+            {p.disclaimer && showDisclaimer && <p className="rounded-lg bg-sand px-3 py-2 text-xs text-muted">{p.disclaimer}</p>}
           </div>
         )}
         {footer}
