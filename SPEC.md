@@ -8,6 +8,13 @@
 
 ## 0. Change log
 
+### v4.5: additions from Parth's own testing
+
+| # | Change |
+|---|---|
+| T28 | **Edit answers & regenerate.** Editor top bar: **Edit answers**. Opens S1 prefilled with this store's input (name, 3 answers, audience size, language, Instagram) for the **same store/token**. Submit = confirmation ("This replaces your bio and all products. Your published page stays as it is until you publish again.") → generation runs with the new input, same pipeline and shared rate limit (T19). |
+| T29 | **Delete store.** Editor overflow menu: **Delete store**. Confirmation: "Delete this store? Its public page will stop working. This can't be undone." Server deletes the row (events cascade) after the token check; the device list drops it; the editor shows "Store deleted" + **Create a new store**. `/s/<slug>` then shows S6. Rate-limited like other writes. |
+
 ### v4.4 — final clarifications
 
 | # | Correction |
@@ -200,13 +207,13 @@ Ananya Sharma, practical Indian vegetarian home cooking, for working professiona
   - Header: name, headline, bio, Instagram handle, WhatsApp number (with the privacy line), accent colour (4 swatches, *cut-first*).
   - Product: availability (Coming soon / Available now; Available now asks for WhatsApp if missing), title, format (select; changing format re-prices to its typical tier), price (₹49–₹99,999; shows "Suggested ₹149–₹499" and a soft warning outside it; D17), one-line summary, description, 3 "what you get" items.
   - **Save** / **Cancel**.
-- Section regenerate: inline skeleton on that block only; the rest stays usable. On failure: toast "Couldn't regenerate, kept your previous version."
+- Section regenerate: the existing card stays in place, dimmed, with a small loading overlay (not a separate skeleton card); on success the card is replaced, on failure the original stays. The rest of the editor stays usable. Icon-only buttons have accessible names ("Regenerate bio", "Regenerate product: <title>"). On failure: toast "Couldn't regenerate, kept your previous version."
 
 ### S4 — Publish
 - **Step 1 (only if no WhatsApp number yet): "How should buyers reach you?"**
   - WhatsApp number (10-digit Indian mobile, +91 prefilled).
   - Privacy line under the field: **"This number will be visible to anyone who opens your store."**
-  - **Add & publish** (primary) · **Skip, show "I'm interested" instead** (secondary, explains the demand-test option in one line).
+  - **Publish with WhatsApp** (primary) · **Publish without WhatsApp** (secondary). One line under both: "Coming-soon products always show an I'm interested button. WhatsApp adds an Ask on WhatsApp option." **Publish without WhatsApp** is disabled, with a reason, while any product is Available now (T5).
 - **Step 2: "Your store is live 🎉"**
   - Public link: **Copy** · **Share on WhatsApp**.
   - Private edit link with warning: "Save this link. It's the only way to edit your store." **Copy edit link.** (Also remembered on this device.)
@@ -437,6 +444,8 @@ No JSON-repair call and no third attempt; a fallback-model retry fixes the same 
 | E21 | 6th store from the same IP within an hour | Friendly "Too many stores created, try again later"; no AI call | |
 | E22 | Edit the bio and a product price, save, refresh | Edits persist in the draft | ✅ |
 | E23 | Regenerate all | New bio and products; confirmation shown first; edit link unchanged | ✅ |
+| E25 | Edit answers → change the niche → confirm | New store content for the same edit link; public page unchanged until republish | |
+| E26 | Delete store → confirm | Editor shows "Store deleted"; public link shows not-found; device list no longer offers it; wrong token can't delete | |
 | E24 | Publish → copy public URL → open in incognito / another phone (no edit token) → then make an unpublished edit | Store renders correctly on mobile; public page unchanged until republish | ✅ |
 
 ## 9. API routes (Next.js App Router)
