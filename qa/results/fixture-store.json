@@ -1,0 +1,73 @@
+{
+ "input": {
+  "name": "QA Ananya Sharma",
+  "expertise": "Home cooking",
+  "audience": "Working professionals",
+  "outcome": "Cook in 20 minutes",
+  "audienceSize": "5k_20k",
+  "language": "hinglish"
+ },
+ "draft": {
+  "theme": "saffron",
+  "creator": {
+   "bio": "Main Ananya hoon. Office ki thakan ke baad bhi aap healthy aur ghar ka bana khana enjoy kar sakte hain. Mere saath seekhein kaise kam waqt mein kitchen ka kaam khatam karein.",
+   "headline": "Office ke baad, sirf 20 minute mein tasty khana",
+   "displayName": "QA Ananya Sharma"
+  },
+  "language": "hinglish",
+  "products": [
+   {
+    "id": "rkcWt2z2",
+    "tier": "low",
+    "price": 149,
+    "title": "20-Minute Weeknight Recipe Collection",
+    "format": "ebook",
+    "summary": "15 quick recipes that take less than 20 minutes from start to finish.",
+    "tierReason": "A low price point is perfect for followers to quickly start cooking faster without a huge commitment.",
+    "whatYouGet": [
+     "PDF with 15 quick recipes",
+     "Weekly meal prep checklist",
+     "List of 10 essential pantry staples"
+    ],
+    "description": "Busy office days don't mean ordering out. This collection helps you whip up healthy meals in minutes so you have more time to relax.",
+    "priceSource": "ai_tier",
+    "availability": "coming_soon"
+   },
+   {
+    "id": "yTdrhmoI",
+    "tier": "typical",
+    "price": 399,
+    "title": "Master the 20-Minute Kitchen Workflow",
+    "format": "live_workshop",
+    "summary": "Learn my exact method to cook daily meals in under 20 minutes.",
+    "tierReason": "A live workshop offers better value for the audience to learn techniques directly and ask questions in real-time.",
+    "whatYouGet": [
+     "90-minute live demonstration on Zoom",
+     "Recording of the live session",
+     "Kitchen workflow worksheet"
+    ],
+    "description": "Stop spending hours in the kitchen after a long workday. Join this live session to see my prep hacks and cooking flow in action.",
+    "priceSource": "ai_tier",
+    "availability": "coming_soon"
+   },
+   {
+    "id": "zBuNIf8x",
+    "tier": "high",
+    "price": 1499,
+    "title": "Kitchen Efficiency Audit & Plan",
+    "format": "one_on_one",
+    "summary": "A private session to redesign your kitchen routine for maximum speed.",
+    "tierReason": "Personalized attention for the creator's audience size allows for a premium tier that addresses individual kitchen challenges.",
+    "whatYouGet": [
+     "45-minute 1:1 video consultation",
+     "Customised weekly meal template",
+     "Personalised kitchen organization tips"
+    ],
+    "description": "We will look at your current cooking habits and customize a plan that fits your kitchen setup and food preferences. Get personal help to save time.",
+    "priceSource": "ai_tier",
+    "availability": "coming_soon"
+   }
+  ],
+  "sensitiveDomain": "none"
+ }
+}
