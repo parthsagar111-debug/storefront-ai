@@ -263,9 +263,42 @@ export function buildStoreContent(ok: Ok, input: StoreInput, existing?: TStoreCo
 }
 
 /** Bio regenerate: claims check only (no prices involved). */
-export function acceptBio(r: { headline: string; bio: string }, input: StoreInput, domain: Domain = "none") {
+export function acceptBio(r: { headline: string; bio: string }, input: StoreInput, domain: Domain = "none", primary = false) {
   checkClaims([r.headline, r.bio], input, domain);
-  return r;
+  return checkHinglishGender(r, input, primary, "bio regenerate");
+}
+
+/**
+ * Round 5 item 3 (Hinglish stores only): a first-person gendered verb in the bio or headline ("main … sikhati hoon")
+ * fails the PRIMARY attempt (→ fallback). On the fallback a few safe forms are rewritten deterministically; anything
+ * else is accepted and logged. Words from the creator's own name never count ("Main Preeti hoon").
+ */
+export const GENDERED_FIRST_PERSON = /\b(main|mai)\b[^.]{0,40}\b(\w+(?:ta|ti|ega|egi))\s+(hoon|hun|hu)\b/gi;
+const SAFE_REWRITES: [RegExp, string][] = [
+  [/\b(main|mai)\s+(?:aapko\s+)?(?:sikhata|sikhati|sikhaata|sikhaati)\s+(?:hoon|hun|hu)\b/gi, "mere saath aap seekhenge"],
+  [/\b(main|mai)\s+(?:aapki\s+)?help\s+(?:karta|karti)\s+(?:hoon|hun|hu)\b/gi, "main help karne ke liye yahan hoon"],
+];
+export function findGenderedVerbs(text: string, name = ""): string[] {
+  const nameWords = new Set(name.toLowerCase().split(/\s+/).filter(Boolean));
+  return [...text.matchAll(GENDERED_FIRST_PERSON)].filter((m) => !nameWords.has(m[2].toLowerCase())).map((m) => m[0]);
+}
+export function checkHinglishGender<T extends { headline: string; bio: string }>(r: T, input: StoreInput, primary: boolean, label = "generation"): T {
+  if (input.language !== "hinglish") return r;
+  const hits = [...findGenderedVerbs(r.headline, input.name), ...findGenderedVerbs(r.bio, input.name)];
+  if (!hits.length) return r;
+  if (primary) {
+    console.warn(`[checks] gendered first-person verb on primary (${label}) → fallback: "${hits[0]}"`);
+    throw new CheckFailed(`hinglish gender: "${hits[0]}"`);
+  }
+  const fix = (t: string) =>
+    SAFE_REWRITES.reduce(
+      (acc, [re, w]) => acc.replace(re, (m: string, _main: string, offset: number) => (/^[A-Z]/.test(m) || offset === 0 ? w[0].toUpperCase() + w.slice(1) : w)),
+      t,
+    );
+  const out = { ...r, headline: fix(r.headline), bio: fix(r.bio) };
+  const left = [...findGenderedVerbs(out.headline, input.name), ...findGenderedVerbs(out.bio, input.name)];
+  console.warn(`[checks] gendered first-person verb on fallback (${label}): ${left.length ? `accepted as is: "${left[0]}"` : "rewritten"}`);
+  return out;
 }
 
 /**
@@ -329,6 +362,8 @@ export function acceptGeneration(raw: unknown, input: StoreInput, existing: TSto
   if (r.status === "ok") {
     const content = buildStoreContent(r, input, existing);
     checkBuyerInReasons(r.products, input, primary);
+    const g = checkHinglishGender(content.creator, input, primary);
+    content.creator = { ...content.creator, headline: g.headline, bio: g.bio };
     // Logged in the generation_completed event (round 4 item 3: how often the fallback's generic reasons are kept).
     return { kind: "ok", content, genericReasons: !reasonsMentionBuyer(r.products.map((p) => p.tierReason), input.audience) };
   }

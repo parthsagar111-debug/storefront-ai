@@ -12,7 +12,7 @@ import {
 } from "@/lib/ai/schemas";
 import { BioResultSchema, ProductResultSchema, GenerationResultUnionSchema } from "@/lib/ai/response-schemas";
 import { systemPrompt, bioUserPrompt, productUserPrompt, generationUserPrompt } from "@/lib/ai/prompts";
-import { parseGeneration, buildStoreContent, acceptBio, acceptProduct, normalizeModelOutput, checkBuyerInReasons } from "@/lib/ai/build-store";
+import { parseGeneration, buildStoreContent, acceptBio, acceptProduct, normalizeModelOutput, checkBuyerInReasons, checkHinglishGender } from "@/lib/ai/build-store";
 import { CheckFailed } from "@/lib/ai/pipeline";
 import { ENTRY_MAX } from "@/lib/pricing";
 import { HINT_MAX } from "@/lib/ai/prompts";
@@ -64,10 +64,10 @@ export async function POST(req: Request, ctx: RouteContext<"/api/stores/[token]/
       system,
       user: bioUserPrompt(ci, current, body.data.hint),
       schema: BioResultSchema,
-      accept: (raw) => {
+      accept: (raw, { primary }) => {
         const r = BioResult.safeParse(normalizeModelOutput(raw));
         if (!r.success) throw new CheckFailed("zod: " + r.error.message.slice(0, 300));
-        return acceptBio(r.data, input, draft.sensitiveDomain);
+        return acceptBio(r.data, input, draft.sensitiveDomain, primary);
       },
     });
     if (!out.ok) return Response.json({ error: "ai_failed" }, { status: 502 });
@@ -118,7 +118,8 @@ export async function POST(req: Request, ctx: RouteContext<"/api/stores/[token]/
         if (r.status === "ok") {
           buildStoreContent(r, input, draft); // checks → fallback model on failure
           checkBuyerInReasons(r.products, input, primary, "regenerate all");
-          return { ok: r };
+          const g = checkHinglishGender({ headline: r.headline, bio: r.bio }, input, primary, "regenerate all");
+          return { ok: { ...r, headline: g.headline, bio: g.bio } };
         }
         return { message: r.status === "needs_more" ? r.question : r.reason };
       },

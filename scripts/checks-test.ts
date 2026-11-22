@@ -1,5 +1,5 @@
 // Unit checks for the deterministic rules (SPEC §7.4). Run: npx tsx --conditions=react-server scripts/checks-test.ts
-import { scrubTierReason, checkClaims, sensitiveDomain, enforceLadder, toStoredProduct, checkDistinct, acceptProduct, buildStoreContent, acceptGeneration, fitTierReason, parseGeneration, fitText, normalizeModelOutput, rewriteAudienceLabels, reasonsMentionBuyer, checkBuyerInReasons } from "../src/lib/ai/build-store";
+import { scrubTierReason, checkClaims, sensitiveDomain, enforceLadder, toStoredProduct, checkDistinct, acceptProduct, buildStoreContent, acceptGeneration, fitTierReason, parseGeneration, fitText, normalizeModelOutput, rewriteAudienceLabels, reasonsMentionBuyer, checkBuyerInReasons, findGenderedVerbs, checkHinglishGender } from "../src/lib/ai/build-store";
 import { generationUserPrompt } from "../src/lib/ai/prompts";
 import { normalizeIndianMobile, waText, waLink } from "../src/lib/whatsapp";
 import { parseInstagram } from "../src/lib/instagram";
@@ -220,5 +220,26 @@ t("buyer: fallback accepts", !throws(() => checkBuyerInReasons([{ tierReason: "A
   const ok = { status: "ok", headline: "Headline here", bio: "b".repeat(80), sensitiveDomain: "none", products: [mp("ebook", "low", "a"), mp("template_pack", "low", "b")] };
   t("acceptGeneration: generic on primary fails", throws(() => acceptGeneration(structuredClone(ok), input({ audience: "Working professionals" }), null, false, true)));
   t("acceptGeneration: generic on fallback ok", !throws(() => acceptGeneration(structuredClone(ok), input({ audience: "Working professionals" }), null, false, false)));
+}
+// Round 5 item 3: Hinglish first-person gendered verbs in bio / headline
+{
+  const hi = input({ language: "hinglish", name: "Ananya Sharma" });
+  for (const txt of ["Main sikhati hoon quick recipes.", "Main aapko simple recipes sikhata hoon.", "Mai help karti hun office walon ki.", "Main roz naye dishes banati hu."])
+    t(`gender found: "${txt}"`, findGenderedVerbs(txt, hi.name).length === 1);
+  for (const txt of ["Mere saath aap seekhenge quick recipes.", "Mera focus hai simple khana.", "Main help karne ke liye yahan hoon.", "Main Ananya hoon. Office ke baad bhi khana."])
+    t(`gender clean: "${txt}"`, findGenderedVerbs(txt, hi.name).length === 0);
+  t("gender: creator's own name never counts (Main Preeti hoon)", findGenderedVerbs("Main Preeti hoon.", "Preeti Rao").length === 0 && findGenderedVerbs("Main Smita hoon.", "Smita").length === 0);
+  const r = { headline: "Roz ka khana, 20 minute mein", bio: "Main sikhati hoon quick recipes jo office ke baad ban jaayein." };
+  t("gender: primary fails (Hinglish)", throws(() => checkHinglishGender(r, hi, true)));
+  t("gender: English store not checked", !throws(() => checkHinglishGender(r, input({ language: "en" }), true)));
+  const f = checkHinglishGender(r, hi, false);
+  t("gender: fallback rewrites sikhati → 'Mere saath aap seekhenge'", f.bio === "Mere saath aap seekhenge quick recipes jo office ke baad ban jaayein.", f.bio);
+  const h = checkHinglishGender({ headline: "Fitness made simple", bio: "Main working women ki help karti hoon." }, hi, false);
+  t("gender: fallback without a safe rewrite → accepted as is", h.bio === "Main working women ki help karti hoon.");
+  t("gender: fallback 'Main help karta hoon' → 'Main help karne ke liye yahan hoon'", checkHinglishGender({ headline: "h", bio: "Main help karta hoon." }, hi, false).bio === "Main help karne ke liye yahan hoon.");
+  const ok = { status: "ok", headline: "Headline here", bio: "Main sikhata hoon roz ka khana, bas 20 minute mein, office ke baad bhi.", sensitiveDomain: "none", products: [{ ...mp("ebook", "low", "a"), tierReason: "For students." }, mp("template_pack", "low", "b")] };
+  t("acceptGeneration: gendered bio on primary fails", throws(() => acceptGeneration(structuredClone(ok), input({ language: "hinglish" }), null, false, true)));
+  const g = acceptGeneration(structuredClone(ok), input({ language: "hinglish" }), null, false, false);
+  t("acceptGeneration: fallback rewrites the bio", g.kind === "ok" && g.content.creator.bio.startsWith("Mere saath aap seekhenge"), g.kind === "ok" ? g.content.creator.bio : "");
 }
 console.log(fail ? `${fail} FAILED` : "ALL PASSED"); process.exit(fail ? 1 : 0);

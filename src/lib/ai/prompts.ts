@@ -22,6 +22,7 @@ const OUTCOME_MISSING = `not given; infer a realistic result from the skill and 
 const LANGUAGE_BLOCK: Record<Language, string> = {
   en: `Write everything in simple, clear Indian English. Short sentences.`,
   hinglish: `Hindi verbs change with gender. Use the creator's gender only if it is clear from the name; keep it consistent in every sentence. If it is unclear, rephrase to avoid gendered verbs: "Mere saath aap seekhenge…" or "Mera focus hai…" instead of "main sikhata/sikhati hoon".
+In the bio and headline, avoid first-person verbs that change with gender (sikhata/sikhati, karta/karti); use 'Mere saath aap…', 'Mera focus…' or 'Main help karne ke liye yahan hoon' style instead.
 Write the headline, bio, summaries, descriptions and whatYouGet in Hinglish: Hindi and English mixed naturally in Roman script, the way urban Indian creators write on Instagram. Example tone: "Roz ka khana, bas 20 minute mein. Simple recipes jo office ke baad bhi ban jaayein." Product titles can stay mostly English. tierReason stays in simple English (only the creator sees it). Do not use Devanagari script.`,
 };
 
