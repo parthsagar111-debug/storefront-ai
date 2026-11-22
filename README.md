@@ -26,6 +26,18 @@ npm run dev
 | `FORCE_AI_FAIL` | demo switch: `1` = primary model fails (fallback shown), `2` = both fail (retry screen) |
 | `SUPABASE_DB_URL` | local only, for `scripts/migrate.mjs` |
 
+## Models and free-tier limits
+The key is on Gemini's **free tier** (billing not verified), so the app runs on two free models, both set by env vars:
+
+| Role | Env var | Model | Free-tier limits (AI Studio → Rate Limit, 22 Nov) |
+|---|---|---|---|
+| Primary | `GEMINI_MODEL` | `gemini-3.5-flash-lite` | 15 RPM · 250K TPM · 500 RPD |
+| Fallback | `GEMINI_FALLBACK_MODEL` | `gemini-3.1-flash-lite` | 15 RPM · 250K TPM · 500 RPD |
+
+Limits are per Google Cloud project and RPD resets at midnight Pacific. One new store is usually 1 request (2 if the primary fails or a check sends it to the fallback). With 500 RPD on each model no second fallback was added.
+
+**When billing verifies:** switching to `gemini-3.8-flash` is a config change only. Set `GEMINI_MODEL=gemini-3.8-flash` and `GEMINI_FALLBACK_MODEL=gemini-3.5-flash-lite` in Vercel → Settings → Environment Variables (Production), then redeploy. No code change. Don't do it on the free tier: there `gemini-3.8-flash` allows only 5 RPM / 20 RPD.
+
 ## How it works (short)
 - `/` → `POST /api/stores` (idempotent on a browser-generated `clientRequestId` + edit token) → generation runs server-side via `after()` with an atomic claim → `/edit/[token]` polls every 2 s.
 - Gemini returns format + tier; code sets prices (§7.5), enforces the ≤ ₹499 entry rule, unique formats, claim and safety checks, and adds finance/health disclaimers.
