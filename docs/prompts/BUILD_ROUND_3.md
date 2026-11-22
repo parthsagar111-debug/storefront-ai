@@ -1,0 +1,36 @@
+Round 3: the final agreed version. Replaces the earlier FIX_PROMPT_3 (don't use that one). Every item below was reviewed and agreed by Parth, Claude, ChatGPT and Gemini. The source of truth is the attached **SPEC.md v5** (see §0 "v5 — three-way review", items V1–V7) and **PROMPTS.md v5**. Replace both files in the repo first.
+
+Rules: tag `pre-round-3` first. One commit per item. Use the existing design system (Claude Design's updated screens arrive later as a separate polish pass; build behaviour and copy now). Deploy after items 1–3, again after 4–6, again after 7–9. Re-run the core gate after each deploy. Stop and report at the end.
+
+**1. Prompts (V2).** Copy PROMPTS v5 into `prompts.ts` exactly (shared system prompt, user templates, hint blocks). Check character for character. Code: when a text field exceeds its schema limit by ≤ 15%, trim at a word boundary instead of failing; beyond that, fail the attempt (→ fallback).
+
+**2. Price table (V7).** Update the format + tier → price map and the entry-eligibility map to SPEC §7.5 v5: live_workshop 199/399/799; one_on_one 299/699/1,499; community 99/199/399 (all tiers entry-eligible); others unchanged. Update the suggested ranges shown in the editor. Unit tests for the map and the ladder rule.
+
+**3. Product regenerate keeps the set valid (V2).** After a single-product regenerate, validate the whole set (unique formats, an entry product present). If invalid, keep the old product and show "Couldn't regenerate, kept your previous version." Accept an optional `hint` (≤ 120 chars) for bio and product regenerate, passed inside `<creator_hint>` as in PROMPTS v5.
+
+**4. Input screen (V1).** Build exactly as SPEC v5 V1: stacked full-width fields with sentence labels "I'm" / "I teach" / "to"; audience chips depend on the niche (mapping below; general chips if unknown; never overwrite typed text); followers one tap; language visible; "More options" collapsed with optional result (niche-aware chips) and Instagram ("Shown as a link on your store. We don't read your profile."). Headline and subline as in V1. Result optional end to end (schema, prompt line, follow-up logic). Keep QA-07 on-blur messages and the keyboard-safe Create button at 360px.
+Audience chips: Home cooking → Working professionals · Students living alone · New moms · Beginners. Fitness for women → New moms · Working women · Beginners at home · Women over 40. Stock market basics → College students · Salaried beginners · Small business owners. UPSC prep → First-time aspirants · Working aspirants · Mains repeaters. Vedic astrology → Working women · Couples · Beginners curious about astrology. Canva design → Small business owners · Freelancers · Students. General → Working professionals · College students · Beginners · Small business owners.
+Result chips: stock market → Start a first SIP · Read a company's numbers · Avoid common mistakes; cooking → Cook in 20 minutes · Plan a week of meals · Eat healthier on a budget; fitness → Get stronger at home · Build a daily routine · Recover after pregnancy safely; UPSC → Write better Mains answers · Plan the syllabus · Revise faster; astrology → Read your own chart · Understand your dasha · Pick good dates; Canva → Make posts in 10 minutes · Build a brand kit · Design for clients.
+
+**5. Generating and side states (V3).** Skeleton header with the creator's name; one status line using their audience ("Finding products for <audience>…"), no follower-count pricing claim; indeterminate indicator instead of the 4-step bar; "Taking a little longer…" at 12s; stale/interrupted → "Generation was interrupted. Try again."; 200–300ms fade into the editor + one-time tip "Tap Edit on anything to change it" (remember dismissal in localStorage); follow-up shows a compact editable summary + "Edit my answers" (edits re-run the clarity check); offline detection → "You're offline. Reconnect to continue." (no extra silent retry).
+
+**6. Editor (V4 + earlier round-3 items).**
+- 10s "Regenerated. Undo" toast after any regenerate (bio, product, all); Undo restores the exact previous version including format, price and availability.
+- **Remove product** in the product sheet while more than 2 products; refuse if it would remove the only entry product (explain why).
+- Optional "What should change?" field (≤ 120 chars) in the regenerate action for bio and product.
+- "Edit answers" → **"Start over / Edit answers"**, confirmation: "This replaces your bio and all products, including your edits. Your live page stays as it is until you publish again."
+- Changing format re-prices only if `priceSource` is `ai_tier`; if the creator set the price, keep it and show the new suggested range.
+- Phone top bar (< 768px): store name + status badge + **Publish**; "⋯" menu holds Start over / Edit answers, Regenerate all, View as buyer, Delete store. Desktop unchanged.
+- **View as buyer:** full-screen draft rendered with the public component (no editor controls, CTAs inert), small bar "Buyer view of your draft · Back to editing".
+- Muted line above products: "Prices are starting suggestions based on format and your audience. Tap Why ₹X? or edit any price."
+- Label "Your store preview" (not "This is what buyers see").
+
+**7. Publish (V5).** One sheet: readiness toggles above (copy "Buyers will contact you on WhatsApp. Payments aren't collected on this store."), WhatsApp below (optional until any product is Available now, then required with the reason; privacy line on focus/fill; +91/leading 0 normalised); sticky Publish. Republish with nothing to ask → one tap "Update live store". Show "Your store is live" only after the publish response confirms the save **and** a GET of the public URL returns 200; otherwise keep the draft and offer Retry (idempotent). Success screen: native share (`navigator.share`) with Copy fallback; "Paste this link into your Instagram bio."; "Save my private edit link on WhatsApp" (wa.me with the edit link and "Private: anyone with this link can edit your store. Don't forward it." prefilled) + Copy, with the same warning shown.
+
+**8. Public store (V6).** Available-now products first (cheapest first), then a "Coming soon" subheading (cheapest first). Under "Enquire on WhatsApp": "Chat with <first name> to buy. No payment on this page." Coming-soon cards: "Indicative price. Final price may change when available." WhatsApp prefill: title + price, in the store's language (Hinglish template for Hinglish stores). No public interest counts anywhere. WhatsApp CTAs only with a valid stored number (re-validate at render). Disclaimers only when the domain applies.
+
+**9. Mini eval, 4 generations** (free tier): cooking/Hinglish (Ananya, 5K–20K), finance for small business owners (English, under 5K), career coach (English, no audience yet), UPSC (English, 100K+). Report per store: products specific to the audience (yes/no each), learn → apply → guided progression, bio quoted (Instagram-like?), every tierReason (mentions the buyer; no raw "No audience yet"), word targets met or trimmed, prices match the v5 table. Paste the 4 JSONs into QA_REPORT.md §11, then delete the eval stores (0 stores left).
+
+**Final report:** commits per item, core gate result after each deploy, eval summary, anything you had to decide, anything not done.
+
+Still open from earlier: item 0, key rotation. Parth will give you the new keys.

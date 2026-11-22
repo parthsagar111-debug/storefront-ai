@@ -1,6 +1,6 @@
 # Design tokens — "Haldi & Ink"
 
-Extracted from `Storefront AI — Mobile Screens.html` (board 17 + computed styles of every board; see `png/_tokens-raw.json`, `png/_frames/`). Names map 1:1 to the Tailwind `@theme` in `src/app/globals.css`.
+Extracted from `Storefront AI — Mobile Screens.html` (board 17 + computed styles of every board; `scripts/render-design.mjs` regenerates the per-frame dumps locally, they are not committed). Names map 1:1 to the Tailwind `@theme` in `src/app/globals.css`.
 
 ## Neutrals
 | Token | Hex | Use |
