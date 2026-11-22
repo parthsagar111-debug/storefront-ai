@@ -19,7 +19,7 @@ npm run dev
 | Var | Notes |
 |---|---|
 | `GEMINI_API_KEY` | server only |
-| `GEMINI_MODEL` / `GEMINI_FALLBACK_MODEL` | primary / fallback model ids (live: `gemini-3.5-flash-lite` / `gemini-3.1-flash-lite`, see BUILD_LOG) |
+| `GEMINI_MODEL` / `GEMINI_FALLBACK_MODEL` | primary / fallback model ids (live: `gemini-3.1-flash-lite` / `gemini-3.5-flash-lite`, see BUILD_LOG) |
 | `IP_HASH_SALT` | random string for hashing IPs |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | server only, never `NEXT_PUBLIC_` |
 | `NEXT_PUBLIC_APP_URL` | public base URL |
@@ -31,8 +31,8 @@ The key is on Gemini's **free tier** (billing not verified), so the app runs on 
 
 | Role | Env var | Model | Free-tier limits (AI Studio → Rate Limit, 22 Nov) |
 |---|---|---|---|
-| Primary | `GEMINI_MODEL` | `gemini-3.5-flash-lite` | 15 RPM · 250K TPM · 500 RPD |
-| Fallback | `GEMINI_FALLBACK_MODEL` | `gemini-3.1-flash-lite` | 15 RPM · 250K TPM · 500 RPD |
+| Primary | `GEMINI_MODEL` | `gemini-3.1-flash-lite` | 15 RPM · 250K TPM · 500 RPD |
+| Fallback | `GEMINI_FALLBACK_MODEL` | `gemini-3.5-flash-lite` | 15 RPM · 250K TPM · 500 RPD |
 
 Limits are per Google Cloud project and RPD resets at midnight Pacific. One new store is usually 1 request (2 if the primary fails or a check sends it to the fallback). With 500 RPD on each model no second fallback was added.
 
