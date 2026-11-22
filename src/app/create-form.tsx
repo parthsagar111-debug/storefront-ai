@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Chip, ChoiceChip, Segmented, Logo, btnClass, inputCls } from "@/components/ui";
 import type { ReactNode } from "react";
-import { IconArrowUpRight, IconAlert, IconChevronDown, IconChevronUp } from "@/components/icons";
+import { IconArrowUpRight, IconAlert } from "@/components/icons";
 import { parseInstagram, INSTAGRAM_HINT } from "@/lib/instagram";
 import {
   listStores,
@@ -108,7 +108,6 @@ function CreateFormInner() {
   const [size, setSize] = useState<string>("");
   const [lang, setLang] = useState<"en" | "hinglish">("en");
   const [insta, setInsta] = useState("");
-  const [moreOpen, setMoreOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErr, setFieldErr] = useState<Record<string, string>>({});
@@ -142,7 +141,6 @@ function CreateFormInner() {
         setSize(i.audienceSize ?? "");
         setLang(i.language ?? "en");
         if (i.instagramHandle) setInsta(i.instagramHandle);
-        if (i.outcome) setMoreOpen(true);
       })
       .catch(() => {});
   }, []);
@@ -384,6 +382,18 @@ function CreateFormInner() {
             {/* Chips follow the niche; tapping one fills the field, typed text is never overwritten by a niche change. */}
             <ChipRow chips={AUDIENCE_CHIPS[niche ?? "general"]} value={v.audience} onPick={(c) => pick("audience", c)} />
           </TextField>
+
+          {/* Optional last line of the sentence (SPEC V1: a missing result never triggers a follow-up). */}
+          <TextField
+            k="outcome"
+            big
+            optional
+            label="so they can"
+            placeholder={niche ? `e.g. ${RESULT_CHIPS[niche][0][0].toLowerCase()}${RESULT_CHIPS[niche][0].slice(1)}` : "e.g. cook dinner in 20 minutes"}
+            {...fieldProps("outcome")}
+          >
+            {niche && <ChipRow chips={RESULT_CHIPS[niche]} value={v.outcome} onPick={(c) => pick("outcome", c)} />}
+          </TextField>
         </div>
 
         <fieldset className="space-y-2">
@@ -405,7 +415,7 @@ function CreateFormInner() {
           <FieldError id="e-audienceSize" msg={fieldErr.audienceSize} />
         </fieldset>
 
-        {/* Instagram: always visible, below the follower chips and above Language (styled like the result field). */}
+        {/* Instagram: always visible, below the follower chips and above Language. */}
         <div className="space-y-2">
           <label htmlFor="f-insta" className="block text-sm font-semibold">
             Instagram handle <span className="font-normal text-muted">(optional)</span>
@@ -448,32 +458,6 @@ function CreateFormInner() {
               ["hinglish", "Hinglish"],
             ]}
           />
-        </div>
-
-        <div className={`border-y border-line ${moreOpen ? "pb-5" : ""}`}>
-          <button
-            type="button"
-            aria-expanded={moreOpen}
-            aria-controls="more-options"
-            className="flex min-h-[52px] w-full items-center justify-between px-0.5 text-left text-[15px] font-semibold"
-            onClick={() => setMoreOpen((o) => !o)}
-          >
-            <span>More options</span>
-            {moreOpen ? <IconChevronUp size={20} /> : <IconChevronDown size={20} />}
-          </button>
-          {moreOpen && (
-            <div id="more-options" className="space-y-[18px] pt-1">
-              <TextField
-                k="outcome"
-                label="What will they be able to do after?"
-                optional
-                placeholder={niche ? `e.g. ${RESULT_CHIPS[niche][0][0].toLowerCase()}${RESULT_CHIPS[niche][0].slice(1)}` : "e.g. cook dinner in 20 minutes"}
-                {...fieldProps("outcome")}
-              >
-                {niche && <ChipRow chips={RESULT_CHIPS[niche]} value={v.outcome} onPick={(c) => pick("outcome", c)} />}
-              </TextField>
-            </div>
-          )}
         </div>
 
         {error && (
@@ -530,7 +514,7 @@ function TextField(props: {
     <div className={props.big ? "flex flex-col gap-2.5" : "space-y-2"}>
       <label htmlFor={`f-${k}`} className={props.big ? "block font-display text-[26px] font-bold leading-none" : "block text-sm font-semibold"}>
         {props.label}
-        {props.optional && <span className="font-normal text-muted"> (optional)</span>}
+        {props.optional && <span className={`font-normal text-muted ${props.big ? "font-sans text-sm" : ""}`}> (optional)</span>}
       </label>
       {props.children}
       <input
