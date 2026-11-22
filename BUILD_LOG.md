@@ -4,6 +4,22 @@ Per slice: what was built, problems hit, decisions made, how AI tools were used.
 
 ---
 
+## 🛠 Round 5 — Sun 22 Nov, before submission
+Tag `pre-round-5` = state before. Production left at **0 stores, 0 events**.
+
+| Item | Commit | Result |
+|---|---|---|
+| Free-tier limits | `98f4f4d` | `gemini-3.5-flash-lite` and `gemini-3.1-flash-lite`: 15 RPM · 250K TPM · **500 RPD** each (AI Studio rate-limit view) → no second fallback; README notes the config-only switch to `gemini-3.8-flash` (free tier there: 5 RPM / 20 RPD) |
+| Hinglish gender | `96a3837` | first-person gendered verb in a Hinglish bio/headline fails the primary attempt; fallback rewrites safe forms or accepts + logs; creator's own name excluded; prompt line added (prompts.ts + PROMPTS.md); unit tests |
+| README | `8a16eb4` | repo link, setup, env var names, how AI tools were used |
+| Regression | — | core gate **42/43** (E8: both models wrote a price reason > 184 chars on a single-product regenerate → old product kept with "Couldn't regenerate, kept your previous version.", the agreed round-3 behaviour); `round3-ui.mjs` **12/12** |
+| 2 Hinglish generations | — | primary 503 → fallback ok both times; bios gender-neutral, gender check didn't need to fire (below) |
+
+- Priya (female): "Mere saath aap seekhenge busy days mein bhi healthy khana banana. Office ke baad thakne ka bahana chhod kar fresh meals ready karein. Roz ka cooking ab stress nahi, bas 20 minute ka kaam hai."
+- Rohit (male): "Mere saath aap busy schedule mein bhi strength build kar sakte hain. Ghar par bina heavy equipment ke workout routine follow karein. Mera focus hai aapko daily life mein fit aur strong rakhna."
+
+---
+
 ## 🛠 Round 4 — Sun 22 Nov, overnight (design polish + 3 fixes + final regression; details in QA_REPORT §12)
 Tag `pre-round-4` = state before. One deploy (items 0–3); final regression on production all green; production left at **0 stores, 0 events**.
 
