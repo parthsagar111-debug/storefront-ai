@@ -2,7 +2,7 @@
 
 A creator answers three quick questions and taps twice on their phone, and gets a published storefront (bio, 2–4 product ideas with INR prices) at a shareable link. The link also shows which idea gets the most interest. Built as a take-home for SuperProfile. See `SPEC.md`.
 
-**Live:** https://storefront-ai-blush.vercel.app
+**Live:** https://storefront-ai-blush.vercel.app · **Repo:** https://github.com/parthsagar111-debug/storefront-ai
 
 ## Stack
 Next.js 16 (App Router), TypeScript, Tailwind, Zod, `@google/genai` (Gemini), Supabase Postgres (server-side service-role key only), Vercel.
@@ -57,6 +57,10 @@ node scripts/core-gate.mjs        # core gate (SPEC §8) against the live URL, A
 node scripts/recovery-test.mjs    # stale pending/generating → Retry accepted; fresh → refused
 node scripts/smoke.mjs            # E1/E2/E9/E11 smoke
 npx tsx --conditions=react-server scripts/checks-test.ts    # deterministic checks (unit)
+npx tsx scripts/prompts-match.ts                             # prompts.ts vs PROMPTS.md, character for character
 npx tsx --conditions=react-server scripts/model-check.ts    # real calls to both models with the production schemas
 ```
 The DB-backed scripts need `SUPABASE_DB_URL` in `.env.local`.
+
+## How AI tools were used
+Parth wrote the product spec (`SPEC.md`) and prompt text (`PROMPTS.md`) as PM, reviewing them with Claude, ChatGPT and Gemini, and Claude Design produced the screens (`Design/`). Claude Code built the app from those files slice by slice, then ran the QA and fix rounds: tests against production, a mini eval after each prompt change, and the design polish pass. Gemini runs inside the product to write bios and product ideas, while code sets every price and enforces the rules. `BUILD_LOG.md` records each slice and round (what was built, problems, decisions, commits), and `QA_REPORT.md` has the test and eval evidence.
