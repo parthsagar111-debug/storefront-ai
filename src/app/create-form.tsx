@@ -356,38 +356,6 @@ function CreateFormInner() {
         <div className="flex flex-col gap-5 rounded-[22px] border border-line bg-surface px-4 py-5">
           <TextField k="name" big label="I'm" placeholder="Your name" autoComplete="name" {...fieldProps("name")} />
 
-          {/* Instagram is always visible, directly under the name. */}
-          <div className="space-y-2">
-            <label htmlFor="f-insta" className="block text-sm font-semibold">
-              Instagram handle <span className="font-normal text-muted">(optional)</span>
-            </label>
-            <div
-              className={`flex overflow-hidden rounded-xl border bg-surface focus-within:border-saffron ${fieldErr.instagramHandle ? "border-danger" : "border-line-input"}`}
-            >
-              <span className="flex items-center border-r border-line-input bg-[#F7F1E8] px-3 font-bold text-ink/80">@</span>
-              <input
-                id="f-insta"
-                className="min-h-12 w-full px-3 text-base outline-none"
-                value={insta.replace(/^@/, "")}
-                autoCapitalize="none"
-                autoCorrect="off"
-                aria-invalid={Boolean(fieldErr.instagramHandle)}
-                aria-describedby={fieldErr.instagramHandle ? "e-instagramHandle h-insta" : "h-insta"}
-                onChange={(e) => {
-                  setInsta(e.target.value);
-                  clearErr("instagramHandle");
-                }}
-                onBlur={() => {
-                  // A pasted profile URL becomes the handle the creator will see on the store.
-                  const h = parseInstagram(insta);
-                  if (h) setInsta(h);
-                }}
-              />
-            </div>
-            <FieldError id="e-instagramHandle" msg={fieldErr.instagramHandle} />
-            <p id="h-insta" className="text-[13px] leading-snug text-muted">Shown as a link on your store. We don&apos;t read your profile.</p>
-          </div>
-
           <TextField k="expertise" big label="I teach" placeholder="or type what you teach" {...fieldProps("expertise")}>
             <ChipRow chips={NICHES.map(([, c]) => c)} value={v.expertise} onPick={(c) => pick("expertise", c)} />
           </TextField>
@@ -416,6 +384,38 @@ function CreateFormInner() {
           </div>
           <FieldError id="e-audienceSize" msg={fieldErr.audienceSize} />
         </fieldset>
+
+        {/* Instagram: always visible, below the follower chips and above Language (styled like the result field). */}
+        <div className="space-y-2">
+          <label htmlFor="f-insta" className="block text-sm font-semibold">
+            Instagram handle <span className="font-normal text-muted">(optional)</span>
+          </label>
+          <div
+            className={`flex min-h-12 overflow-hidden rounded-xl border-[1.5px] bg-surface focus-within:border-saffron ${fieldErr.instagramHandle ? "border-danger" : "border-line-input"}`}
+          >
+            <span className="flex items-center border-r border-line-input bg-[#F7F1E8] px-3 font-bold text-ink/80">@</span>
+            <input
+              id="f-insta"
+              className="min-h-12 w-full px-3 text-base outline-none"
+              value={insta.replace(/^@/, "")}
+              autoCapitalize="none"
+              autoCorrect="off"
+              aria-invalid={Boolean(fieldErr.instagramHandle)}
+              aria-describedby={fieldErr.instagramHandle ? "e-instagramHandle h-insta" : "h-insta"}
+              onChange={(e) => {
+                setInsta(e.target.value);
+                clearErr("instagramHandle");
+              }}
+              onBlur={() => {
+                // A pasted profile URL becomes the handle the creator will see on the store.
+                const h = parseInstagram(insta);
+                if (h) setInsta(h);
+              }}
+            />
+          </div>
+          <FieldError id="e-instagramHandle" msg={fieldErr.instagramHandle} />
+          <p id="h-insta" className="text-[13px] leading-snug text-muted">Shown as a link on your store. We don&apos;t read your profile.</p>
+        </div>
 
         <div className="space-y-2">
           <span className="block text-[15px] font-semibold">Language</span>
