@@ -7,7 +7,7 @@ import { IconAlert, IconCheck, IconChevronRight, IconLoader, IconPencil, IconRef
 import { use, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import StoreEditor, { type Counts } from "./store-editor";
 import type { EditorView } from "@/lib/server/store-access";
-import { saveStore, listStores } from "@/lib/client/device";
+import { saveStore, listStores, removeStore } from "@/lib/client/device";
 
 const AUDIENCE_LABEL: Record<string, string> = {
   none: "No audience yet",
@@ -69,7 +69,10 @@ function EditorInner({ params }: { params: Promise<{ token: string }> }) {
   const fetchStore = useCallback(async (): Promise<Load | null> => {
     try {
       const res = await fetch(`/api/stores/${encodeURIComponent(token)}`, { cache: "no-store" });
-      if (res.status === 404) return { state: "missing" };
+      if (res.status === 404) {
+        removeStore(token); // forget a deleted store on this device (no dead "Continue your store")
+        return { state: "missing" };
+      }
       if (!res.ok) return null;
       const store: EditorView & { counts: Counts | null } = await res.json();
       // Remember the edit link on this device (also covers links opened on a new device).
@@ -130,7 +133,7 @@ function EditorInner({ params }: { params: Promise<{ token: string }> }) {
     );
 
   if (load.state === "loading") return <Skeleton line="Loading your store…" />;
-  if (load.state === "missing") return <NotFoundView />;
+  if (load.state === "missing") return <NotFoundView variant="edit" />;
 
   const s = load.store;
   const restart = async (path: "retry" | "answer", body?: unknown) => {

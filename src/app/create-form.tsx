@@ -10,6 +10,7 @@ import {
   listStores,
   saveStore,
   updateStore,
+  removeStore,
   newToken,
   newClientRequestId,
   storageAvailable,
@@ -154,13 +155,32 @@ function CreateFormInner() {
       if (!ok) return;
       const stores = listStores();
       // Lost-response recovery: re-send unconfirmed submissions with the same ids (idempotent on the server).
-      stores
+      const resent = stores
         .filter((s) => !s.confirmed && s.input)
-        .forEach(async (s) => {
+        .map(async (s) => {
           const r = await submitStore(s);
           if (r.ok) updateStore(s.token, { confirmed: true, slug: r.slug });
         });
-      setRecent(stores[0] ?? null);
+      // "Continue your store" only for a store that still exists: check every remembered token in parallel
+      // (short timeout); 404 → forget it on this device; a network failure → no banner rather than a dead link.
+      void Promise.allSettled(resent).then(async () => {
+        const saved = listStores();
+        const checks = await Promise.all(
+          saved.map(async (st) => {
+            try {
+              const res = await fetch(`/api/stores/${encodeURIComponent(st.token)}`, { cache: "no-store", signal: AbortSignal.timeout(4000) });
+              if (res.status === 404) {
+                removeStore(st.token);
+                return null;
+              }
+              return res.ok ? st : null;
+            } catch {
+              return null;
+            }
+          }),
+        );
+        setRecent(checks.find((x): x is SavedStore => x !== null) ?? null);
+      });
     }, 0);
     return () => clearTimeout(t);
   }, []);
