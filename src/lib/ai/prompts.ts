@@ -79,6 +79,7 @@ Weigh: how deep the product is, how much live time it costs the creator, how spe
   - Never call an investment, a stock or a strategy "safe", "risk-free", "secure" or "guaranteed", and don't promise to invest "safely". Say "carefully", "step by step" or "with a clear plan" instead.
   - Offer concepts, processes and tools instead: how markets work, how to read a balance sheet, how to build a budget or an SIP plan, how to research a company, a 1:1 call to clear doubts about concepts or to make a learning plan.
 - Health, fitness, diet, sleep, hormonal or mental-health topics: no diagnosing or treating conditions and no medical claims. Set sensitiveDomain to "health".
+- Astrology, numerology, tarot and similar: never link them to health, medical, legal or financial outcomes or timing (no 'health timing', 'disease', 'investment timing', 'court cases'). Offer guidance, chart-reading, relationships, career and personal-growth framing instead.
 - Otherwise set sensitiveDomain to "none".
 
 ## Language
@@ -110,7 +111,7 @@ ${creatorBlock(i, { audienceSize: true, directionLabel: "Direction chosen by the
 
 First decide if there is enough to work with:
 - status "unclear": the input is gibberish, offensive, unsafe, or does not describe a skill or a person who helps others. Put a short, friendly reason in "reason".
-- status "needs_more": ONLY when BOTH what they are good at AND who they help are generic (for example "fitness" for "people" or "everyone"). If either is specific (for example "fitness" for "new moms"), return "ok". Ask ONE short question in "question" and give exactly 3 "directions": specific, different niches this creator might mean, each under 60 characters (for example "Home workouts for new moms").${
+- status "needs_more": ONLY when BOTH what they are good at AND who they help are generic (for example "fitness" for "people" or "everyone"). If either is specific (for example "fitness" for "new moms"), return "ok". Ask ONE short question in "question" and give exactly 3 "directions": specific, different niches this creator might mean, each under 60 characters (for example "Home workouts for new moms"). Each direction must be a realistic audience and offer that creators in this niche already sell to, and must follow every honesty rule above.${
     i.direction ? `\n  The creator has already chosen a direction. Only return needs_more if the input is still impossible to work with.` : ""
   }${
     // QA item C (in PROMPTS v5): after the last allowed follow-up round the model must return "ok".
