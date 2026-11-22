@@ -110,18 +110,24 @@ for (const txt of ["Invest carefully, step by step, with a clear plan", "A safe 
   t(`finance safe-wording allowed: "${txt}"`, !throws(() => checkClaims([txt], input({ expertise: "Stock market basics" }), "finance")));
 t("safe-wording check inactive outside finance", !throws(() => checkClaims(["A safe home workout to invest 20 minutes in yourself"], input({ expertise: "Fitness" }), "health")));
 t("finance patterns inactive outside finance", !throws(() => checkClaims(["Portfolio review of your design work"], input({ expertise: "Graphic design" }), "none")));
-// Round 2: PROMPTS v3 tierReasons longer than SPEC's 160 chars are trimmed, not rejected
+// Round 5b: tierReason never fails for length — trimmed to ≤ 200 (whole sentences, else word boundary + ".")
 {
   const short = "A light starter guide for college students who are new to investing.";
   t("tierReason: short unchanged", fitTierReason(short) === short);
-  const two = "A short PDF for college students who have never invested before and want the basics first. It is light reading that they can finish in one evening before class starts.";
-  t("tierReason: keeps whole sentences ≤ 160", fitTierReason(two) === "A short PDF for college students who have never invested before and want the basics first." && fitTierReason(two).length <= 160, fitTierReason(two));
-  const one = "This is a single very long sentence written for working professionals who cook after office hours and want a deeper weekly plan with shopping lists and prep timings and swaps";
+  const s1 = "A short PDF for college students who have never invested before and want the basics first, so a low first price makes it easy to try.";
+  const two = s1 + " It is light reading that they can finish in one evening before class starts tomorrow.";
+  t("tierReason: keeps whole sentences ≤ 200", fitTierReason(two) === s1, fitTierReason(two));
+  const one = "This is a single very long sentence written for working professionals who cook after office hours and want a deeper weekly plan with shopping lists and prep timings and swaps for every dish and every busy weekday evening";
   const f = fitTierReason(one);
-  t("tierReason: one long sentence cut at a word with …", f.length <= 160 && f.endsWith("…") && one.startsWith(f.slice(0, -1)), `${f.length}: ${f}`);
+  t("tierReason: one long sentence cut at a word, clean ending", f.length <= 200 && f.endsWith(".") && !/[,;:]\.$/.test(f) && !/\b(and|for|with|the)\.$/.test(f) && one.startsWith(f.slice(0, -1)), `${f.length}: ${f}`);
+  const huge = "x ".repeat(400).trim();
+  t("tierReason: 800-char reason → ≤ 200", fitTierReason(huge).length <= 200);
   const raw = { status: "ok", headline: "Headline here", bio: "b".repeat(80), sensitiveDomain: "none",
-    products: [{ ...mp("ebook", "low", "a"), tierReason: two + " " + two }, mp("template_pack", "low", "b")] };
-  t("tierReason: > 15% over (300+ chars) fails the attempt (SPEC v5 V2)", throws(() => parseGeneration(raw)));
+    products: [{ ...mp("ebook", "low", "a"), tierReason: (two + " ").repeat(4) }, mp("template_pack", "low", "b")] };
+  t("tierReason: 500+ chars no longer fails the attempt", !throws(() => parseGeneration(raw)));
+  const pr = normalizeModelOutput({ product: { ...mp("one_on_one", "low", "q"), tierReason: one + " " + one } }) as { product: { tierReason: string } };
+  t("tierReason: single-product regenerate trims too (E8)", pr.product.tierReason.length <= 200);
+  t("other fields keep the 15% rule (title 70/60 still fails)", fitText("x".repeat(70), 60, false).length === 70);
 }
 // Round 3 item 1: every text field ≤ 15% over its limit is trimmed at a word boundary; beyond that, Zod fails.
 {

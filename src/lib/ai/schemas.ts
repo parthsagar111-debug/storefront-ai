@@ -18,7 +18,7 @@ export const ModelProduct = z.object({
   title: z.string().min(4).max(60),
   format: Format,
   tier: Tier,
-  tierReason: z.string().max(160),
+  tierReason: z.string().max(200), // round 5b: trimmed to ≤ 200 in code, never fails for length
   summary: z.string().min(10).max(90),
   description: z.string().min(40).max(420),
   whatYouGet: z.array(z.string().min(3).max(70)).length(3),

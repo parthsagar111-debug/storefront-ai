@@ -20,7 +20,8 @@ type Domain = TStoreContent["sensitiveDomain"];
  * as is, so Zod fails the attempt (→ fallback model).
  */
 export const OVER_LIMIT_TOLERANCE = 0.15;
-export const TIER_REASON_MAX = 160;
+/** Round 5b: tierReason (creator-only "Why ₹X?" text) is capped at 200 and NEVER fails an attempt for length. */
+export const TIER_REASON_MAX = 200;
 
 const DANGLING = /(?:[\s,;:–—&/-]+|\s+(?:and|or|for|with|to|of|in|on|the|a|an|aur|ke|ki|ka|se|mein))+$/i;
 
@@ -44,10 +45,27 @@ export function fitText(text: string, max: number, prose: boolean): string {
   return prose ? cut.replace(/[.!?]$/, "") + "…" : cut;
 }
 
-/** Back-compat name used by tests: tierReason trimming under the same 15% rule. */
-export const fitTierReason = (reason: string) => fitText(reason, TIER_REASON_MAX, true);
+/**
+ * Round 5b: any over-long tierReason is trimmed (no 15% rule): the whole sentences that fit in 200 chars; if not even
+ * the first one fits, cut at the last word boundary, drop dangling words / punctuation and end with a full stop.
+ */
+export function fitTierReason(reason: string): string {
+  const s = reason.trim().replace(/\s+/g, " ");
+  if (s.length <= TIER_REASON_MAX) return s;
+  let out = "";
+  for (const sentence of s.split(/(?<=[.!?])\s+/)) {
+    const next = out ? `${out} ${sentence}` : sentence;
+    if (next.length > TIER_REASON_MAX) break;
+    out = next;
+  }
+  if (out) return out;
+  let cut = s.slice(0, TIER_REASON_MAX);
+  cut = cut.slice(0, Math.max(cut.lastIndexOf(" "), 1));
+  for (let prev = ""; prev !== cut; ) { prev = cut; cut = cut.replace(DANGLING, ""); }
+  return cut.replace(/[.!?…]+$/, "") + ".";
+}
 
-const LIMITS = { title: [60, false], summary: [90, true], description: [420, true], tierReason: [160, true] } as const;
+const LIMITS = { title: [60, false], summary: [90, true], description: [420, true] } as const;
 
 /** Normalise model output before Zod (full generation, bio and single product): the 15% trim on every text field. */
 export function normalizeModelOutput(raw: unknown): unknown {
@@ -57,6 +75,7 @@ export function normalizeModelOutput(raw: unknown): unknown {
     if (!p || typeof p !== "object") return;
     const q = p as Record<string, unknown>;
     for (const [k, [max, prose]] of Object.entries(LIMITS)) if (typeof q[k] === "string") q[k] = fitText(q[k] as string, max, prose);
+    if (typeof q.tierReason === "string") q.tierReason = fitTierReason(q.tierReason); // never fails for length
     if (Array.isArray(q.whatYouGet)) q.whatYouGet = q.whatYouGet.map((w) => (typeof w === "string" ? fitText(w, 70, false) : w));
   };
   if (typeof r.headline === "string") r.headline = fitText(r.headline, 70, false);
